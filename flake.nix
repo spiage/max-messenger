@@ -118,15 +118,15 @@
             if [ -n "$SERVICE_DIR" ]; then
               echo "Fixing service directory structure at: $SERVICE_DIR"
               
-              # Переименовываем папку в ...-inner, чтобы освободить путь для файла
-              mv "$SERVICE_DIR" "${SERVICE_DIR}-inner"
+              # ИСПРАВЛЕНО: Используем $SERVICE_DIR (bash переменная) вместо ${SERVICE_DIR}
+              mv "$SERVICE_DIR" "$SERVICE_DIR-inner"
               
               # Пути к ресурсам сервиса
-              SERVICE_BIN_REAL="${SERVICE_DIR}-inner/bin/max-service"
-              SERVICE_LIB_DIR="${SERVICE_DIR}-inner/lib64"
-              SERVICE_PLUGINS_DIR="${SERVICE_DIR}-inner/plugins"
+              SERVICE_BIN_REAL="$SERVICE_DIR-inner/bin/max-service"
+              SERVICE_LIB_DIR="$SERVICE_DIR-inner/lib64"
+              SERVICE_PLUGINS_DIR="$SERVICE_DIR-inner/plugins"
 
-              # Создаем обертку по тому пути, который ожидает приложение
+              # Создаем обертку
               makeWrapper "$SERVICE_BIN_REAL" "$SERVICE_DIR" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
@@ -148,7 +148,7 @@
             echo "Found MAX binary at: $MAIN_BIN"
 
             # Создаем обертку для MAX
-            # $out/bin/max-service добавлять в PATH не обязательно, если MAX находит его по относительному пути
+            # ${pkgs...} - это nix переменные, они должны быть с {}
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
