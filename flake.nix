@@ -28,7 +28,6 @@
             hash = "sha256-pKHOsmfN7HLeQliiCirJcZ5BrkKwlviomO5CXI6dxvA=";
           };
 
-          # ИСПРАВЛЕНИЕ: Отключаем автоматическую обертку Qt, так как мы делаем это сами
           dontWrapQtApps = true;
 
           nativeBuildInputs = with pkgs; [ 
@@ -84,12 +83,12 @@
             libxcb-render-util
             libxcb-util
 
-            # Зависимости из последнего лога
-            libxkbfile      # libxkbfile.so.1
-            libXv           # libXv.so.1
-            libfontenc      # libfontenc.so.1
-            libXaw          # libXaw.so.7
-            qt6.qtserialport # libQt6SerialPort.so.6
+            # Зависимости из лога
+            libxkbfile
+            libXv
+            libfontenc
+            libXaw
+            qt6.qtserialport
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -110,32 +109,34 @@
             fi
 
             # ---------------------------------------------------------
-            # 1. Обработка СЕРВИСА (max-service)
+            # ИСПРАВЛЕНИЕ СТРУКТУРЫ ДЛЯ СЕРВИСА
+            # Приложение ищет max-service в той же папке, где лежит max
+            # Но там лежит папка, а не файл. Переименовываем её.
             # ---------------------------------------------------------
-            SERVICE_BIN=$(find $out/share/max/bin -maxdepth 3 -type f -executable -name "max-service" | head -n 1)
+            SERVICE_DIR=$(find $out/share/max/bin -type d -name "max-service" | head -n 1)
 
-            if [ -n "$SERVICE_BIN" ]; then
-              echo "Found MAX Service binary at: $SERVICE_BIN"
+            if [ -n "$SERVICE_DIR" ]; then
+              echo "Fixing service directory structure at: $SERVICE_DIR"
               
-              # Определяем пути к ресурсам сервиса (библиотеки, плагины)
-              # Структура: .../bin/max-service/bin/max-service
-              #             .../bin/max-service/lib64
-              SERVICE_DIR=$(dirname "$SERVICE_BIN")
-              SERVICE_LIB_DIR="$SERVICE_DIR/../lib64"
-              SERVICE_PLUGINS_DIR="$SERVICE_DIR/../plugins"
+              # Переименовываем папку в ...-inner, чтобы освободить путь для файла
+              mv "$SERVICE_DIR" "${SERVICE_DIR}-inner"
               
-              mkdir -p $out/bin
-              # Создаем обертку для сервиса
-              makeWrapper "$SERVICE_BIN" "$out/bin/max-service" \
+              # Пути к ресурсам сервиса
+              SERVICE_BIN_REAL="${SERVICE_DIR}-inner/bin/max-service"
+              SERVICE_LIB_DIR="${SERVICE_DIR}-inner/lib64"
+              SERVICE_PLUGINS_DIR="${SERVICE_DIR}-inner/plugins"
+
+              # Создаем обертку по тому пути, который ожидает приложение
+              makeWrapper "$SERVICE_BIN_REAL" "$SERVICE_DIR" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
                 --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
             else
-              echo "Warning: MAX Service binary not found!"
+              echo "Warning: MAX Service directory not found!"
             fi
 
             # ---------------------------------------------------------
-            # 2. Обработка ГЛАВНОГО ПРИЛОЖЕНИЯ (MAX)
+            # ОБРАБОТКА ГЛАВНОГО ПРИЛОЖЕНИЯ
             # ---------------------------------------------------------
             MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
 
@@ -147,9 +148,8 @@
             echo "Found MAX binary at: $MAIN_BIN"
 
             # Создаем обертку для MAX
-            # ДОБАВЛЯЕМ $out/bin В PATH, чтобы MAX нашел запущенный max-service
+            # $out/bin/max-service добавлять в PATH не обязательно, если MAX находит его по относительному пути
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
-              --prefix PATH : $out/bin \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
