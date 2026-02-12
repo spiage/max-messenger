@@ -28,6 +28,9 @@
             hash = "sha256-pKHOsmfN7HLeQliiCirJcZ5BrkKwlviomO5CXI6dxvA=";
           };
 
+          # ИСПРАВЛЕНИЕ: Отключаем автоматическую обертку Qt, так как мы делаем это сами
+          dontWrapQtApps = true;
+
           nativeBuildInputs = with pkgs; [ 
             dpkg 
             autoPatchelfHook 
@@ -81,7 +84,7 @@
             libxcb-render-util
             libxcb-util
 
-            # ЗАВИСИМОСТИ ИЗ ПОСЛЕДНЕГО ЛОГА (поиск выполнен верно)
+            # Зависимости из последнего лога
             libxkbfile      # libxkbfile.so.1
             libXv           # libXv.so.1
             libfontenc      # libfontenc.so.1
