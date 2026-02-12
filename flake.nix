@@ -109,19 +109,47 @@
                 mv opt/* $out/ 2>/dev/null || true
             fi
 
-            # Автопоиск основного бинарника
+            # ---------------------------------------------------------
+            # 1. Обработка СЕРВИСА (max-service)
+            # ---------------------------------------------------------
+            SERVICE_BIN=$(find $out/share/max/bin -maxdepth 3 -type f -executable -name "max-service" | head -n 1)
+
+            if [ -n "$SERVICE_BIN" ]; then
+              echo "Found MAX Service binary at: $SERVICE_BIN"
+              
+              # Определяем пути к ресурсам сервиса (библиотеки, плагины)
+              # Структура: .../bin/max-service/bin/max-service
+              #             .../bin/max-service/lib64
+              SERVICE_DIR=$(dirname "$SERVICE_BIN")
+              SERVICE_LIB_DIR="$SERVICE_DIR/../lib64"
+              SERVICE_PLUGINS_DIR="$SERVICE_DIR/../plugins"
+              
+              mkdir -p $out/bin
+              # Создаем обертку для сервиса
+              makeWrapper "$SERVICE_BIN" "$out/bin/max-service" \
+                --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
+                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
+                --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
+            else
+              echo "Warning: MAX Service binary not found!"
+            fi
+
+            # ---------------------------------------------------------
+            # 2. Обработка ГЛАВНОГО ПРИЛОЖЕНИЯ (MAX)
+            # ---------------------------------------------------------
             MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
 
             if [ -z "$MAIN_BIN" ]; then
-              echo "ERROR: Binary 'MAX' not found in $out!"
+              echo "ERROR: MAX binary not found in $out!"
               exit 1
             fi
 
             echo "Found MAX binary at: $MAIN_BIN"
 
-            # Создаем обертку
-            mkdir -p $out/bin
+            # Создаем обертку для MAX
+            # ДОБАВЛЯЕМ $out/bin В PATH, чтобы MAX нашел запущенный max-service
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
+              --prefix PATH : $out/bin \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
