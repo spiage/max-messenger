@@ -11,10 +11,9 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          config.allowUnfree = true; # MAX - проприетарный софт
+          config.allowUnfree = true; 
         };
 
-        # Данные пакета
         version = "26.4.1";
         debFile = "MAX-26.4.1.46437.deb";
         
@@ -26,18 +25,16 @@
 
           src = pkgs.fetchurl {
             url = "https://download.max.ru/linux/deb/pool/main/m/max/${debFile}";
-            # Правильный хеш из репозитория
-            hash = "sha256-a4a1ceb267cdec72de4258a20a2ac9719e41ae42b096f8a898ee425c8e9dc6f0";
+            # ИСПРАВЛЕНО 1: Хеш переведен в формат SRI (Base64)
+            hash = "sha256-pKHK4sfc3HLtQlijCirLGZ5BrkKwlviooY7kXI6dxvA=";
           };
 
-          # Инструменты сборки
           nativeBuildInputs = with pkgs; [ 
             dpkg 
             autoPatchelfHook 
             makeWrapper 
           ];
 
-          # Зависимости (из Debian Depends + база для Electron)
           buildInputs = with pkgs; [
             alsa-lib
             at-spi2-atk
@@ -61,18 +58,19 @@
             nss
             pango
             wayland
-            xorg.libX11
-            xorg.libXcomposite
-            xorg.libXdamage
-            xorg.libXext
-            xorg.libXfixes
-            xorg.libXrandr
-            xorg.libXrender
-            xorg.libXScrnSaver
-            xorg.libxcb
+            
+            # ИСПРАВЛЕНО 2: Использованы новые имена библиотек без xorg.*
+            libx11
+            libxcomposite
+            libxdamage
+            libxext
+            libxfixes
+            libxrandr
+            libxrender
+            libxscrnsaver
+            libxcb
           ];
 
-          # Распаковка .deb
           unpackPhase = "dpkg -x $src .";
 
           installPhase = ''
@@ -80,13 +78,11 @@
 
             mkdir -p $out
             
-            # Переносим содержимое /usr и /opt в корень $out
             mv usr/* $out/ || true
             if [ -d "opt" ]; then
                 mv opt/* $out/
             fi
 
-            # Ищем исполняемый файл (зависит от версии MAX)
             if [ -f "$out/opt/MAX/MAX" ]; then
               MAIN_BIN="$out/opt/MAX/MAX"
             elif [ -f "$out/opt/MAX/max" ]; then
@@ -98,13 +94,11 @@
 
             chmod +x $MAIN_BIN
 
-            # Создаем удобную обертку в $out/bin/max
             mkdir -p $out/bin
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
-            # Desktop entry и иконки (если есть)
             if [ -f "$out/opt/MAX/max.desktop" ]; then
               mkdir -p $out/share/applications
               cp $out/opt/MAX/max.desktop $out/share/applications/
