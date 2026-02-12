@@ -124,9 +124,6 @@
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
               # ИСПРАВЛЕНИЕ КОНФЛИКТА БИБЛИОТЕК
-              # Удаляем старые libmount и libselinux из пакета,
-              # так как они конфликтуют с системными библиотеками Nix (glib).
-              # Системные версии новее и будут взяты из buildInputs.
               rm -f "$SERVICE_LIB_DIR/libmount.so.1"
               rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
               echo "Removed conflicting bundled libs (libmount, libselinux)"
@@ -155,13 +152,20 @@
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
-            # Исправление .desktop
+            # ---------------------------------------------------------
+            # ИСПРАВЛЕНИЕ ЯРЛЫКА (.desktop file)
+            # ---------------------------------------------------------
             DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
             if [ -n "$DESKTOP_FILE" ]; then
                 substituteInPlace "$DESKTOP_FILE" \
+                  --replace "/usr/share/max/bin/max" "$out/bin/max" \
                   --replace "Exec=MAX" "Exec=$out/bin/max" \
                   --replace "/opt/MAX" "$out/opt/MAX" \
                   --replace "Exec=max" "Exec=$out/bin/max"
+                  
+                # Дополнительно поправим Icon путь, если он абсолютный
+                substituteInPlace "$DESKTOP_FILE" \
+                  --replace "Icon=/usr/share/max" "Icon=max"
             fi
 
             runHook postInstall
