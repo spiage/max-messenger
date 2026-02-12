@@ -25,8 +25,8 @@
 
           src = pkgs.fetchurl {
             url = "https://download.max.ru/linux/deb/pool/main/m/max/${debFile}";
-            # ИСПРАВЛЕНО 1: Хеш переведен в формат SRI (Base64)
-            hash = "sha256-pKHK4sfc3HLtQlijCirLGZ5BrkKwlviooY7kXI6dxvA=";
+            # ИСПРАВЛЕННЫЙ ХЕШ (из строки "got" в твоей ошибке)
+            hash = "sha256-pKHOsmfN7HLeQliiCirJcZ5BrkKwlviomO5CXI6dxvA=";
           };
 
           nativeBuildInputs = with pkgs; [ 
@@ -49,17 +49,15 @@
             libdrm
             libgbm
             libglvnd
-            libnotify       # libnotify4
-            libva           # libva-x11-2
-            libvdpau        # libvdpau1
+            libnotify
+            libva
+            libvdpau
             libxkbcommon
             mesa
             nspr
             nss
             pango
             wayland
-            
-            # ИСПРАВЛЕНО 2: Использованы новые имена библиотек без xorg.*
             libx11
             libxcomposite
             libxdamage
