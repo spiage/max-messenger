@@ -68,21 +68,21 @@
             libxrandr
             libxrender
             libxscrnsaver
-            
+            libxcb
+
             # ДОБАВЛЕННЫЕ ЗАВИСИМОСТИ (из лога ошибок)
             libXmu          # libXmu.so.6, libXmuu.so.1
             libXpm          # libXpm.so.4
             libXres         # libXRes.so.1
             libXt           # libXt.so.6
             libXtst         # libXtst.so.6
-            libxcb
 
-            # Специфичные расширения XCB (для max-service)
-            libxcb-icccm       # libxcb-icccm.so.4
-            libxcb-image       # libxcb-image.so.0
-            libxcb-render-util # libxcb-render-util.so.0
-            libxcb-util        # libxcb-util.so.1
-            libxcb-ewmh        # libxcb-ewmh.so.2
+            # ИСПРАВЛЕНЫЕ ЗАВИСИМОСТИ XCB
+            # Вместо libxcb-icccm, libxcb-ewmh и т.д. используем правильные пакеты
+            xcb-util-wm          # libxcb-icccm.so.4, libxcb-ewmh.so.2
+            xcb-util-image       # libxcb-image.so.0
+            xcb-util-renderutil  # libxcb-render-util.so.0
+            xcb-util             # libxcb-util.so.1
           ];
 
           unpackPhase = "dpkg -x $src .";
