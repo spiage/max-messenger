@@ -25,7 +25,6 @@
 
           src = pkgs.fetchurl {
             url = "https://download.max.ru/linux/deb/pool/main/m/max/${debFile}";
-            # Последний рабочий хеш
             hash = "sha256-pKHOsmfN7HLeQliiCirJcZ5BrkKwlviomO5CXI6dxvA=";
           };
 
@@ -36,6 +35,7 @@
           ];
 
           buildInputs = with pkgs; [
+            # Базовый набор Electron
             alsa-lib
             at-spi2-atk
             at-spi2-core
@@ -58,6 +58,8 @@
             nss
             pango
             wayland
+
+            # Основные X11 библиотеки
             libx11
             libxcomposite
             libxdamage
@@ -66,7 +68,21 @@
             libxrandr
             libxrender
             libxscrnsaver
+            
+            # ДОБАВЛЕННЫЕ ЗАВИСИМОСТИ (из лога ошибок)
+            libXmu          # libXmu.so.6, libXmuu.so.1
+            libXpm          # libXpm.so.4
+            libXres         # libXRes.so.1
+            libXt           # libXt.so.6
+            libXtst         # libXtst.so.6
             libxcb
+
+            # Специфичные расширения XCB (для max-service)
+            libxcb-icccm       # libxcb-icccm.so.4
+            libxcb-image       # libxcb-image.so.0
+            libxcb-render-util # libxcb-render-util.so.0
+            libxcb-util        # libxcb-util.so.1
+            libxcb-ewmh        # libxcb-ewmh.so.2
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -81,38 +97,28 @@
                 mv usr/* $out/ 2>/dev/null || true
             fi
 
-            # Переносим /opt (тут обычно лежит папка MAX)
+            # Переносим /opt
             if [ -d "opt" ]; then
-                # Переносим всё содержимое opt в корень $out
-                # Например: opt/MAX/ -> $out/MAX/
                 mv opt/* $out/ 2>/dev/null || true
             fi
 
-            # АВТОПОИСК БИНАРНОГО ФАЙЛА
-            # Ищем файл с именем MAX или max, который можно выполнить
-            # -iname делает поиск регистронезависимым
+            # Автопоиск основного бинарника
             MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
 
             if [ -z "$MAIN_BIN" ]; then
-              echo "=========================================="
               echo "ERROR: Binary 'MAX' not found in $out!"
-              echo "Listing all files to debug:"
-              find $out -type f -name "*AX*"
-              find $out -type f -name "*ax*"
-              echo "=========================================="
               exit 1
             fi
 
             echo "Found MAX binary at: $MAIN_BIN"
 
-            # Создаем лаунчер в bin
+            # Создаем обертку
             mkdir -p $out/bin
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
-            # Настраиваем .desktop файл
-            # Ищем файл desktop где угодно в $out
+            # Исправление .desktop
             DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
             if [ -n "$DESKTOP_FILE" ]; then
                 substituteInPlace "$DESKTOP_FILE" \
