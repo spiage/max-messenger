@@ -110,19 +110,26 @@
 
             # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
-            # Мы сохраняем структуру папок, чтобы симлинки в lib64 работали.
-            # Оборачиваем только бинарный файл внутри папки.
             # ---------------------------------------------------------
             SERVICE_BIN_REAL="$out/share/max/bin/max-service/bin/max-service"
+            SERVICE_DIR="$out/share/max/bin/max-service"
 
             if [ -f "$SERVICE_BIN_REAL" ]; then
               echo "Wrapping MAX Service binary..."
               
               mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
               
-              # Папки для ресурсов сервиса (относительные к его локации)
-              SERVICE_LIB_DIR="$out/share/max/bin/max-service/lib64"
-              SERVICE_PLUGINS_DIR="$out/share/max/bin/max-service/plugins"
+              # Папки для ресурсов сервиса
+              SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
+              SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
+
+              # ИСПРАВЛЕНИЕ КОНФЛИКТА БИБЛИОТЕК
+              # Удаляем старые libmount и libselinux из пакета,
+              # так как они конфликтуют с системными библиотеками Nix (glib).
+              # Системные версии новее и будут взяты из buildInputs.
+              rm -f "$SERVICE_LIB_DIR/libmount.so.1"
+              rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
+              echo "Removed conflicting bundled libs (libmount, libselinux)"
 
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
