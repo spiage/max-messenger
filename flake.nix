@@ -77,11 +77,11 @@
             libXt           # libXt.so.6
             libXtst         # libXtst.so.6
 
-            # ЗАВИСИМОСТИ XCB (Имена из nix search)
-            libxcb-wm          # (покрывает libxcb-icccm.so.4 и libxcb-ewmh.so.2)
-            libxcb-image       # libxcb-image.so.0
-            libxcb-renderutil  # libxcb-render-util.so.0
-            libxcb-util        # libxcb-util.so.1
+            # ЗАВИСИМОСТИ XCB (Финальные имена из nix search)
+            libxcb-wm            # (покрывает libxcb-icccm.so.4 и libxcb-ewmh.so.2)
+            libxcb-image         # libxcb-image.so.0
+            libxcb-render-util   # libxcb-render-util.so.0 (ИСПРАВЛЕНО НА ДЕФИСЫ)
+            libxcb-util          # libxcb-util.so.1
           ];
 
           unpackPhase = "dpkg -x $src .";
