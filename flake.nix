@@ -109,38 +109,27 @@
             fi
 
             # ---------------------------------------------------------
-            # ИСПРАВЛЕНИЕ СТРУКТУРЫ И СИМВОЛИЧЕСКИХ ССЫЛОК
+            # НАСТРОЙКА СЕРВИСА (max-service)
+            # Мы сохраняем структуру папок, чтобы симлинки в lib64 работали.
+            # Оборачиваем только бинарный файл внутри папки.
             # ---------------------------------------------------------
-            SERVICE_DIR=$(find $out/share/max/bin -type d -name "max-service" | head -n 1)
+            SERVICE_BIN_REAL="$out/share/max/bin/max-service/bin/max-service"
 
-            if [ -n "$SERVICE_DIR" ]; then
-              echo "Renaming service directory..."
-              mv "$SERVICE_DIR" "$SERVICE_DIR-inner"
+            if [ -f "$SERVICE_BIN_REAL" ]; then
+              echo "Wrapping MAX Service binary..."
               
-              echo "Fixing broken symlinks in lib64..."
-              # Обновляем симлинки в основной папке библиотек, чтобы они указывали на новую папку сервиса
-              find $out/share/max/lib64 -type l | while read link; do
-                target=$(readlink "$link")
-                if [[ "$target" == *"bin/max-service"* ]]; then
-                  new_target=$(echo "$target" | sed 's|bin/max-service|bin/max-service-inner|g')
-                  rm "$link"
-                  ln -s "$new_target" "$link"
-                  echo "Fixed symlink: $link -> $new_target"
-                fi
-              done
+              mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
+              
+              # Папки для ресурсов сервиса (относительные к его локации)
+              SERVICE_LIB_DIR="$out/share/max/bin/max-service/lib64"
+              SERVICE_PLUGINS_DIR="$out/share/max/bin/max-service/plugins"
 
-              # Пути к ресурсам сервиса
-              SERVICE_BIN_REAL="$SERVICE_DIR-inner/bin/max-service"
-              SERVICE_LIB_DIR="$SERVICE_DIR-inner/lib64"
-              SERVICE_PLUGINS_DIR="$SERVICE_DIR-inner/plugins"
-
-              # Создаем обертку
-              makeWrapper "$SERVICE_BIN_REAL" "$SERVICE_DIR" \
+              makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
                 --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
             else
-              echo "Warning: MAX Service directory not found!"
+              echo "Warning: MAX Service binary not found!"
             fi
 
             # ---------------------------------------------------------
