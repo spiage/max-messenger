@@ -77,12 +77,11 @@
             libXt           # libXt.so.6
             libXtst         # libXtst.so.6
 
-            # ИСПРАВЛЕНЫЕ ЗАВИСИМОСТИ XCB
-            # Вместо libxcb-icccm, libxcb-ewmh и т.д. используем правильные пакеты
-            xcb-util-wm          # libxcb-icccm.so.4, libxcb-ewmh.so.2
-            xcb-util-image       # libxcb-image.so.0
-            xcb-util-renderutil  # libxcb-render-util.so.0
-            xcb-util             # libxcb-util.so.1
+            # ЗАВИСИМОСТИ XCB (Имена из nix search)
+            libxcb-wm          # (покрывает libxcb-icccm.so.4 и libxcb-ewmh.so.2)
+            libxcb-image       # libxcb-image.so.0
+            libxcb-renderutil  # libxcb-render-util.so.0
+            libxcb-util        # libxcb-util.so.1
           ];
 
           unpackPhase = "dpkg -x $src .";
