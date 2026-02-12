@@ -110,23 +110,18 @@
 
             # ---------------------------------------------------------
             # ИСПРАВЛЕНИЕ СТРУКТУРЫ ДЛЯ СЕРВИСА
-            # Приложение ищет max-service в той же папке, где лежит max
-            # Но там лежит папка, а не файл. Переименовываем её.
             # ---------------------------------------------------------
             SERVICE_DIR=$(find $out/share/max/bin -type d -name "max-service" | head -n 1)
 
             if [ -n "$SERVICE_DIR" ]; then
               echo "Fixing service directory structure at: $SERVICE_DIR"
               
-              # ИСПРАВЛЕНО: Используем $SERVICE_DIR (bash переменная) вместо ${SERVICE_DIR}
               mv "$SERVICE_DIR" "$SERVICE_DIR-inner"
               
-              # Пути к ресурсам сервиса
               SERVICE_BIN_REAL="$SERVICE_DIR-inner/bin/max-service"
               SERVICE_LIB_DIR="$SERVICE_DIR-inner/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR-inner/plugins"
 
-              # Создаем обертку
               makeWrapper "$SERVICE_BIN_REAL" "$SERVICE_DIR" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
@@ -147,8 +142,6 @@
 
             echo "Found MAX binary at: $MAIN_BIN"
 
-            # Создаем обертку для MAX
-            # ${pkgs...} - это nix переменные, они должны быть с {}
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
