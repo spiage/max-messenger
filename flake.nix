@@ -25,7 +25,7 @@
 
           src = pkgs.fetchurl {
             url = "https://download.max.ru/linux/deb/pool/main/m/max/${debFile}";
-            # ИСПРАВЛЕННЫЙ ХЕШ (из строки "got" в твоей ошибке)
+            # Последний рабочий хеш
             hash = "sha256-pKHOsmfN7HLeQliiCirJcZ5BrkKwlviomO5CXI6dxvA=";
           };
 
@@ -75,39 +75,50 @@
             runHook preInstall
 
             mkdir -p $out
-            
-            mv usr/* $out/ || true
-            if [ -d "opt" ]; then
-                mv opt/* $out/
+
+            # Переносим /usr
+            if [ -d "usr" ]; then
+                mv usr/* $out/ 2>/dev/null || true
             fi
 
-            if [ -f "$out/opt/MAX/MAX" ]; then
-              MAIN_BIN="$out/opt/MAX/MAX"
-            elif [ -f "$out/opt/MAX/max" ]; then
-              MAIN_BIN="$out/opt/MAX/max"
-            else
-              echo "Error: MAX binary not found!"
+            # Переносим /opt (тут обычно лежит папка MAX)
+            if [ -d "opt" ]; then
+                # Переносим всё содержимое opt в корень $out
+                # Например: opt/MAX/ -> $out/MAX/
+                mv opt/* $out/ 2>/dev/null || true
+            fi
+
+            # АВТОПОИСК БИНАРНОГО ФАЙЛА
+            # Ищем файл с именем MAX или max, который можно выполнить
+            # -iname делает поиск регистронезависимым
+            MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
+
+            if [ -z "$MAIN_BIN" ]; then
+              echo "=========================================="
+              echo "ERROR: Binary 'MAX' not found in $out!"
+              echo "Listing all files to debug:"
+              find $out -type f -name "*AX*"
+              find $out -type f -name "*ax*"
+              echo "=========================================="
               exit 1
             fi
 
-            chmod +x $MAIN_BIN
+            echo "Found MAX binary at: $MAIN_BIN"
 
+            # Создаем лаунчер в bin
             mkdir -p $out/bin
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
-            if [ -f "$out/opt/MAX/max.desktop" ]; then
-              mkdir -p $out/share/applications
-              cp $out/opt/MAX/max.desktop $out/share/applications/
-              substituteInPlace $out/share/applications/max.desktop \
-                --replace "Exec=MAX" "Exec=$out/bin/max" \
-                --replace "/opt/MAX" "$out/opt/MAX"
-            fi
-
-            if [ -d "$out/opt/MAX/icons" ]; then
-               mkdir -p $out/share/icons
-               cp -r $out/opt/MAX/icons/* $out/share/icons/
+            # Настраиваем .desktop файл
+            # Ищем файл desktop где угодно в $out
+            DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
+            if [ -n "$DESKTOP_FILE" ]; then
+                substituteInPlace "$DESKTOP_FILE" \
+                  --replace "Exec=MAX" "Exec=$out/bin/max" \
+                  --replace "/opt/MAX" "$out/opt/MAX" \
+                  --replace "Exec=max" "Exec=$out/bin/max"
             fi
 
             runHook postInstall
