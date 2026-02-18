@@ -25,7 +25,7 @@
 
           src = pkgs.fetchurl {
             url = "https://download.max.ru/linux/deb/pool/main/m/max/${debFile}";
-            hash = "sha256-pKHOsmfN7HLeQliiCirJcZ5BrkKwlviomO5CXI6dxvA=";
+            hash = "sha256-Hs11SgUW7KeKIJiVHFwOn6gdAw5TIqW61lsJZMTeCGc=";
           };
 
           dontWrapQtApps = true;
