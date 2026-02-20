@@ -14,8 +14,8 @@
           config.allowUnfree = true; 
         };
 
-        version = "26.5.0";
-        debFile = "MAX-26.5.0.47773.deb";
+        version = "26.5.1";
+        debFile = "MAX-26.5.1.48203.deb";
         
       in
       {
