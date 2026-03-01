@@ -14,7 +14,6 @@
           config.allowUnfree = true; 
         };
 
-        # ОБНОВЛЕННЫЕ ДАННЫЕ
         version = "26.5.1";
         debFile = "MAX-26.5.1.48203.deb";
         
@@ -38,7 +37,7 @@
           ];
 
           buildInputs = with pkgs; [
-            # Системные библиотеки
+            # Системные библиотеки (используем для GLib и всего остального)
             alsa-lib
             at-spi2-atk
             at-spi2-core
@@ -110,11 +109,27 @@
             fi
 
             # ---------------------------------------------------------
-            # 1. УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК
+            # 1. УДАЛЕНИЕ СИСТЕМНЫХ БИБЛИОТЕК ИЗ БАНДЛА
+            # Это заставит приложение использовать системные версии (как в Astra),
+            # но оставит встроенный libstdc++ (чтобы избежать вылета при закрытии).
             # ---------------------------------------------------------
+            echo "Purging bundled system libraries to enforce system usage..."
+            
+            # Удаляем старые GLib libs (взаимодействие с systemd/dbus)
+            rm -f $out/share/max/lib64/libgio-2.0.so.0
+            rm -f $out/share/max/lib64/libglib-2.0.so.0
+            rm -f $out/share/max/lib64/libgmodule-2.0.so.0
+            rm -f $out/share/max/lib64/libgobject-2.0.so.0
+            
+            # Удаляем старые libmount/libselinux (чтобы не было конфликта с системным GLib)
             rm -f "$out/share/max/lib64/libmount.so.1"
             rm -f "$out/share/max/lib64/libselinux.so.1"
-            
+
+            # То же самое для сервиса
+            rm -f $out/share/max/bin/max-service/lib64/libgio-2.0.so.0
+            rm -f $out/share/max/bin/max-service/lib64/libglib-2.0.so.0
+            rm -f $out/share/max/bin/max-service/lib64/libgmodule-2.0.so.0
+            rm -f $out/share/max/bin/max-service/lib64/libgobject-2.0.so.0
             rm -f "$out/share/max/bin/max-service/lib64/libmount.so.1"
             rm -f "$out/share/max/bin/max-service/lib64/libselinux.so.1"
 
@@ -130,7 +145,7 @@
               SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
-              # Сервис использует свои собственные библиотеки
+              # Сервис использует свои библиотеки (хотя GLib тоже удален, и он возьмет системный)
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
@@ -150,10 +165,7 @@
 
             echo "Found MAX binary at: $MAIN_BIN"
 
-            # ИСПРАВЛЕНИЕ ВЫЛЕТА ПРИ ЗАКРЫТИИ
-            # Мы НЕ добавляем max-service/lib64 в путь основного приложения.
-            # Это заставит его использовать системную libgio/libmount (как в Astra),
-            # избегая конфликта версий при закрытии.
+            # Используем встроенный libstdc++ (через папку lib64), но системный GLib (так как мы его удалили из lib64)
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
