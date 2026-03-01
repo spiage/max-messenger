@@ -130,6 +130,7 @@
               SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
+              # Сервис использует свои собственные библиотеки
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
@@ -147,6 +148,12 @@
               exit 1
             fi
 
+            echo "Found MAX binary at: $MAIN_BIN"
+
+            # ИСПРАВЛЕНИЕ ВЫЛЕТА ПРИ ЗАКРЫТИИ
+            # Мы НЕ добавляем max-service/lib64 в путь основного приложения.
+            # Это заставит его использовать системную libgio/libmount (как в Astra),
+            # избегая конфликта версий при закрытии.
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
@@ -163,13 +170,11 @@
                   --replace "/opt/MAX" "$out/opt/MAX" \
                   --replace "Exec=max" "Exec=$out/bin/max"
                 
-                # Поиск пути к иконке
                 ICON_PATH=$(find $out/share/pixmaps -name "*.png" 2>/dev/null | head -n 1)
                 if [ -z "$ICON_PATH" ]; then
                   ICON_PATH=$(find $out/share/icons -name "max.png" 2>/dev/null | head -n 1)
                 fi
 
-                # Замена на абсолютный путь
                 if [ -n "$ICON_PATH" ]; then
                     sed -i "s|^Icon=.*|Icon=$ICON_PATH|g" "$DESKTOP_FILE"
                 fi
