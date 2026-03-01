@@ -37,7 +37,8 @@
           ];
 
           buildInputs = with pkgs; [
-            # Базовый набор
+            # Системные библиотеки для фоллбека (если не найдутся встроенные)
+            # Но теперь они будут вторыми в приоритете
             alsa-lib
             at-spi2-atk
             at-spi2-core
@@ -109,7 +110,20 @@
             fi
 
             # ---------------------------------------------------------
-            # НАСТРОЙКА СЕРВИСА (max-service)
+            # 1. УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК
+            # Удаляем их из ОБЕИХ папок lib64, чтобы избежать конфликта с системным glib
+            # и чтобы мы могли безопасно использовать системные версии при необходимости.
+            # ---------------------------------------------------------
+            rm -f "$out/share/max/lib64/libmount.so.1"
+            rm -f "$out/share/max/lib64/libselinux.so.1"
+            
+            # Для сервиса тоже проделываем это (на всякий случай)
+            rm -f "$out/share/max/bin/max-service/lib64/libmount.so.1"
+            rm -f "$out/share/max/bin/max-service/lib64/libselinux.so.1"
+            echo "Removed conflicting libs from both main and service lib64"
+
+            # ---------------------------------------------------------
+            # 2. НАСТРОЙКА СЕРВИСА (max-service)
             # ---------------------------------------------------------
             SERVICE_BIN_REAL="$out/share/max/bin/max-service/bin/max-service"
             SERVICE_DIR="$out/share/max/bin/max-service"
@@ -119,17 +133,13 @@
               
               mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
               
-              # Папки для ресурсов сервиса
+              # Пути к ресурсам сервиса
               SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
-              # ИСПРАВЛЕНИЕ КОНФЛИКТА БИБЛИОТЕК
-              rm -f "$SERVICE_LIB_DIR/libmount.so.1"
-              rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
-              echo "Removed conflicting bundled libs (libmount, libselinux)"
-
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
+                --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
                 --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
             else
@@ -137,7 +147,7 @@
             fi
 
             # ---------------------------------------------------------
-            # ОБРАБОТКА ГЛАВНОГО ПРИЛОЖЕНИЯ
+            # 3. ОБРАБОТКА ГЛАВНОГО ПРИЛОЖЕНИЯ (max)
             # ---------------------------------------------------------
             MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
 
@@ -149,11 +159,12 @@
             echo "Found MAX binary at: $MAIN_BIN"
 
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
+              --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
             # ---------------------------------------------------------
-            # ИСПРАВЛЕНИЕ ЯРЛЫКА (.desktop file)
+            # 4. ИСПРАВЛЕНИЕ ЯРЛЫКА (.desktop file)
             # ---------------------------------------------------------
             DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
             if [ -n "$DESKTOP_FILE" ]; then
@@ -163,7 +174,6 @@
                   --replace "/opt/MAX" "$out/opt/MAX" \
                   --replace "Exec=max" "Exec=$out/bin/max"
                   
-                # Дополнительно поправим Icon путь, если он абсолютный
                 substituteInPlace "$DESKTOP_FILE" \
                   --replace "Icon=/usr/share/max" "Icon=max"
             fi
