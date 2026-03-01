@@ -14,6 +14,7 @@
           config.allowUnfree = true; 
         };
 
+        # ОБНОВЛЕННЫЕ ДАННЫЕ
         version = "26.5.1";
         debFile = "MAX-26.5.1.48203.deb";
         
@@ -37,8 +38,7 @@
           ];
 
           buildInputs = with pkgs; [
-            # Системные библиотеки для фоллбека (если не найдутся встроенные)
-            # Но теперь они будут вторыми в приоритете
+            # Системные библиотеки
             alsa-lib
             at-spi2-atk
             at-spi2-core
@@ -62,7 +62,7 @@
             pango
             wayland
 
-            # Основные X11 библиотеки
+            # X11 библиотеки
             libx11
             libxcomposite
             libxdamage
@@ -111,16 +111,12 @@
 
             # ---------------------------------------------------------
             # 1. УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК
-            # Удаляем их из ОБЕИХ папок lib64, чтобы избежать конфликта с системным glib
-            # и чтобы мы могли безопасно использовать системные версии при необходимости.
             # ---------------------------------------------------------
             rm -f "$out/share/max/lib64/libmount.so.1"
             rm -f "$out/share/max/lib64/libselinux.so.1"
             
-            # Для сервиса тоже проделываем это (на всякий случай)
             rm -f "$out/share/max/bin/max-service/lib64/libmount.so.1"
             rm -f "$out/share/max/bin/max-service/lib64/libselinux.so.1"
-            echo "Removed conflicting libs from both main and service lib64"
 
             # ---------------------------------------------------------
             # 2. НАСТРОЙКА СЕРВИСА (max-service)
@@ -130,10 +126,7 @@
 
             if [ -f "$SERVICE_BIN_REAL" ]; then
               echo "Wrapping MAX Service binary..."
-              
               mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
-              
-              # Пути к ресурсам сервиса
               SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
@@ -142,8 +135,6 @@
                 --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
                 --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
-            else
-              echo "Warning: MAX Service binary not found!"
             fi
 
             # ---------------------------------------------------------
@@ -152,11 +143,9 @@
             MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
 
             if [ -z "$MAIN_BIN" ]; then
-              echo "ERROR: MAX binary not found in $out!"
+              echo "ERROR: MAX binary not found!"
               exit 1
             fi
-
-            echo "Found MAX binary at: $MAIN_BIN"
 
             makeWrapper "$MAIN_BIN" "$out/bin/max" \
               --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
@@ -173,9 +162,17 @@
                   --replace "Exec=MAX" "Exec=$out/bin/max" \
                   --replace "/opt/MAX" "$out/opt/MAX" \
                   --replace "Exec=max" "Exec=$out/bin/max"
-                  
-                substituteInPlace "$DESKTOP_FILE" \
-                  --replace "Icon=/usr/share/max" "Icon=max"
+                
+                # Поиск пути к иконке
+                ICON_PATH=$(find $out/share/pixmaps -name "*.png" 2>/dev/null | head -n 1)
+                if [ -z "$ICON_PATH" ]; then
+                  ICON_PATH=$(find $out/share/icons -name "max.png" 2>/dev/null | head -n 1)
+                fi
+
+                # Замена на абсолютный путь
+                if [ -n "$ICON_PATH" ]; then
+                    sed -i "s|^Icon=.*|Icon=$ICON_PATH|g" "$DESKTOP_FILE"
+                fi
             fi
 
             runHook postInstall
