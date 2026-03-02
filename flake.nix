@@ -2,7 +2,7 @@
   description = "MAX Messenger for NixOS (Single File Flake)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -11,12 +11,15 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          config.allowUnfree = true; 
+          config.allowUnfree = true;
         };
 
         version = "26.5.1";
         debFile = "MAX-26.5.1.48203.deb";
-        
+
+        # Примечание: для обновления хеша используйте:
+        # nix-prefetch-url https://download.max.ru/linux/deb/pool/main/m/max/MAX-26.5.1.48203.deb --print-path2
+
       in
       {
         packages.default = pkgs.stdenv.mkDerivation rec {
@@ -30,10 +33,10 @@
 
           dontWrapQtApps = true;
 
-          nativeBuildInputs = with pkgs; [ 
-            dpkg 
-            autoPatchelfHook 
-            makeWrapper 
+          nativeBuildInputs = with pkgs; [
+            dpkg
+            autoPatchelfHook
+            makeWrapper
           ];
 
           buildInputs = with pkgs; [
@@ -89,6 +92,7 @@
             libfontenc
             libXaw
             qt6.qtserialport
+            qt6.qtbase
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -114,13 +118,17 @@
             # но оставит встроенный libstdc++ (чтобы избежать вылета при закрытии).
             # ---------------------------------------------------------
             echo "Purging bundled system libraries to enforce system usage..."
-            
+
+            # Логируем структуру для отладки
+            echo "=== Structure after unpack ==="
+            find $out -type f -name "*.so*" | head -20 || true
+
             # Удаляем старые GLib libs (взаимодействие с systemd/dbus)
             rm -f $out/share/max/lib64/libgio-2.0.so.0
             rm -f $out/share/max/lib64/libglib-2.0.so.0
             rm -f $out/share/max/lib64/libgmodule-2.0.so.0
             rm -f $out/share/max/lib64/libgobject-2.0.so.0
-            
+
             # Удаляем старые libmount/libselinux (чтобы не было конфликта с системным GLib)
             rm -f "$out/share/max/lib64/libmount.so.1"
             rm -f "$out/share/max/lib64/libselinux.so.1"
@@ -151,6 +159,8 @@
                 --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
                 --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
+            else
+              echo "Warning: MAX Service binary not found at $SERVICE_BIN_REAL"
             fi
 
             # ---------------------------------------------------------
@@ -165,34 +175,76 @@
 
             echo "Found MAX binary at: $MAIN_BIN"
 
+            # Определяем путь к плагинам Qt (если существует)
+            QT_PLUGINS_DIR=""
+            if [ -d "$out/share/max/plugins" ]; then
+              QT_PLUGINS_DIR="$out/share/max/plugins"
+            elif [ -d "$out/share/max/lib64/plugins" ]; then
+              QT_PLUGINS_DIR="$out/share/max/lib64/plugins"
+            elif [ -d "$out/plugins" ]; then
+              QT_PLUGINS_DIR="$out/plugins"
+            fi
+
             # Используем встроенный libstdc++ (через папку lib64), но системный GLib (так как мы его удалили из lib64)
-            makeWrapper "$MAIN_BIN" "$out/bin/max" \
-              --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
-              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
-              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
+            if [ -n "$QT_PLUGINS_DIR" ]; then
+              echo "Using Qt plugins from: $QT_PLUGINS_DIR"
+              makeWrapper "$MAIN_BIN" "$out/bin/max" \
+                --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
+                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]} \
+                --set QT_PLUGIN_PATH "$QT_PLUGINS_DIR"
+            else
+              echo "Warning: Qt plugins directory not found, skipping QT_PLUGIN_PATH"
+              makeWrapper "$MAIN_BIN" "$out/bin/max" \
+                --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
+                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
+            fi
 
             # ---------------------------------------------------------
             # 4. ИСПРАВЛЕНИЕ ЯРЛЫКА (.desktop file)
             # ---------------------------------------------------------
             DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
             if [ -n "$DESKTOP_FILE" ]; then
-                substituteInPlace "$DESKTOP_FILE" \
-                  --replace "/usr/share/max/bin/max" "$out/bin/max" \
-                  --replace "Exec=MAX" "Exec=$out/bin/max" \
-                  --replace "/opt/MAX" "$out/opt/MAX" \
-                  --replace "Exec=max" "Exec=$out/bin/max"
+                echo "Patching .desktop file: $DESKTOP_FILE"
                 
-                ICON_PATH=$(find $out/share/pixmaps -name "*.png" 2>/dev/null | head -n 1)
-                if [ -z "$ICON_PATH" ]; then
-                  ICON_PATH=$(find $out/share/icons -name "max.png" 2>/dev/null | head -n 1)
-                fi
-
-                if [ -n "$ICON_PATH" ]; then
-                    sed -i "s|^Icon=.*|Icon=$ICON_PATH|g" "$DESKTOP_FILE"
-                fi
+                # Исправляем Exec (может быть с %U или без)
+                substituteInPlace "$DESKTOP_FILE" \
+                  --replace-warn "/usr/share/max/bin/max" "$out/bin/max" \
+                  --replace-warn "/opt/MAX/bin/max" "$out/bin/max" \
+                  --replace-warn "Exec=MAX " "Exec=$out/bin/max " \
+                  --replace-warn "Exec=max " "Exec=$out/bin/max "
+                
+                # Исправляем иконку если путь абсолютный системный
+                substituteInPlace "$DESKTOP_FILE" \
+                  --replace-warn "Icon=max" "Icon=$out/share/pixmaps/max.png" \
+                  --replace-warn "Icon=/usr/share/pixmaps/max.png" "Icon=$out/share/pixmaps/max.png" \
+                  --replace-warn "Icon=/opt/MAX/share/pixmaps/max.png" "Icon=$out/share/pixmaps/max.png"
+                
+                # Исправляем WorkingDirectory если есть
+                substituteInPlace "$DESKTOP_FILE" \
+                  --replace-warn "Path=/opt/MAX" "Path=$out" \
+                  --replace-warn "Path=/usr/share/max" "Path=$out"
+            else
+              echo "Warning: .desktop file not found"
             fi
 
             runHook postInstall
+          '';
+
+          fixupPhase = ''
+            runHook preFixup
+
+            # Удаляем .la файлы (могут ссылаться на удалённые библиотеки)
+            find $out -name "*.la" -delete || true
+
+            # Проверяем, что бинарники существуют
+            if [ -f "$out/bin/max" ]; then
+              echo "Verifying wrapper: $out/bin/max"
+              file "$out/bin/max"
+            fi
+
+            runHook postFixup
           '';
 
           meta = {
