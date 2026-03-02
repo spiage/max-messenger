@@ -104,28 +104,16 @@
             if [ -d "opt" ]; then mv opt/* $out/ 2>/dev/null || true; fi
 
             # ---------------------------------------------------------
-            # ГЛОБАЛЬНАЯ ОЧИСТКА БИБЛИОТЕК (КРИТИЧЕСКИ ВАЖНО)
+            # УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК
             # ---------------------------------------------------------
-            echo "Removing bundled system libraries to prevent conflicts..."
-
-            # 1. Находим и удаляем ВСЕ копии libstdc++ и libgcc_s внутри пакета.
-            # Это заставляет autoPatchelfHook использовать системные версии.
-            find $out -type f -name "libstdc++.so*" -delete
-            find $out -type f -name "libgcc_s.so*" -delete
-            
-            # 2. Удаляем библиотеки, конфликтующие с системными (GLib, Mount)
-            find $out -type f -name "libmount.so*" -delete
-            find $out -type f -name "libselinux.so*" -delete
-            find $out -type f -name "libgio-2.0.so*" -delete
-            find $out -type f -name "libglib-2.0.so*" -delete
-            find $out -type f -name "libgobject-2.0.so*" -delete
-            find $out -type f -name "libgmodule-2.0.so*" -delete
-
-            # 3. Удаляем библиотеку логирования (Tracer), которая вызывает краш при закрытии
-            # (Boost::log TLS error conflict)
-            find $out -type f -name "libtracernative.so" -delete
-            find $out -type f -name "libtracer_crash_reporter.so" -delete
-            echo "Removed conflicting libraries."
+            # Удаляем только libmount и libselinux из сервиса.
+            # НЕ удаляем libstdc++, libgcc_s, libtracernative, libtracer_crash_reporter,
+            # чтобы autoPatchelfHook мог их найти и пропатчить.
+            SERVICE_LIB_DIR="$out/share/max/bin/max-service/lib64"
+            if [ -d "$SERVICE_LIB_DIR" ]; then
+              rm -f "$SERVICE_LIB_DIR/libmount.so.1"
+              rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
+            fi
 
             # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
@@ -137,7 +125,6 @@
               echo "Wrapping MAX Service binary..."
               mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
               
-              SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
