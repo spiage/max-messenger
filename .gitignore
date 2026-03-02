@@ -5,6 +5,4 @@ QWEN.md
 # Nix
 result
 result-*
-
-# Lock file (опционально, можно закоммитить для воспроизводимости)
-# flake.lock
+flake.lock
