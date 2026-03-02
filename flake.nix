@@ -104,6 +104,30 @@
             if [ -d "opt" ]; then mv opt/* $out/ 2>/dev/null || true; fi
 
             # ---------------------------------------------------------
+            # ГЛОБАЛЬНАЯ ОЧИСТКА БИБЛИОТЕК (КРИТИЧЕСКИ ВАЖНО)
+            # ---------------------------------------------------------
+            echo "Removing bundled system libraries to prevent conflicts..."
+
+            # 1. Находим и удаляем ВСЕ копии libstdc++ и libgcc_s внутри пакета.
+            # Это заставляет autoPatchelfHook использовать системные версии.
+            find $out -type f -name "libstdc++.so*" -delete
+            find $out -type f -name "libgcc_s.so*" -delete
+            
+            # 2. Удаляем библиотеки, конфликтующие с системными (GLib, Mount)
+            find $out -type f -name "libmount.so*" -delete
+            find $out -type f -name "libselinux.so*" -delete
+            find $out -type f -name "libgio-2.0.so*" -delete
+            find $out -type f -name "libglib-2.0.so*" -delete
+            find $out -type f -name "libgobject-2.0.so*" -delete
+            find $out -type f -name "libgmodule-2.0.so*" -delete
+
+            # 3. Удаляем библиотеку логирования (Tracer), которая вызывает краш при закрытии
+            # (Boost::log TLS error conflict)
+            find $out -type f -name "libtracernative.so" -delete
+            find $out -type f -name "libtracer_crash_reporter.so" -delete
+            echo "Removed conflicting libraries."
+
+            # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
             # ---------------------------------------------------------
             SERVICE_BIN_REAL="$out/share/max/bin/max-service/bin/max-service"
@@ -115,13 +139,6 @@
               
               SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
-
-              # Удаляем библиотеки, вызывающие конфликт версий C++ runtime
-              # Это заставит использовать системную libstdc++ и libgcc_s
-              rm -f "$SERVICE_LIB_DIR/libstdc++.so.6"
-              rm -f "$SERVICE_LIB_DIR/libgcc_s.so.1"
-              rm -f "$SERVICE_LIB_DIR/libmount.so.1"
-              rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
 
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
@@ -140,15 +157,6 @@
             fi
 
             echo "Found MAX binary at: $MAIN_BIN"
-
-            # Удаляем конфликтующие библиотеки из основного бандла
-            MAIN_LIB_DIR="$out/share/max/lib64"
-            if [ -d "$MAIN_LIB_DIR" ]; then
-              echo "Removing conflicting bundled libs from main app..."
-              rm -f "$MAIN_LIB_DIR/libstdc++.so.6"
-              rm -f "$MAIN_LIB_DIR/libgcc_s.so.1"
-              # Qt и ICU не трогаем, чтобы не сломать совместимость плагинов
-            fi
 
             # Определяем путь к плагинам Qt
             QT_PLUGINS_DIR=""
