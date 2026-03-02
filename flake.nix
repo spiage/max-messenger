@@ -2,7 +2,7 @@
   description = "MAX Messenger for NixOS (Single File Flake)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -11,12 +11,12 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          config.allowUnfree = true;
+          config.allowUnfree = true; 
         };
 
         version = "26.5.1";
         debFile = "MAX-26.5.1.48203.deb";
-
+        
       in
       {
         packages.default = pkgs.stdenv.mkDerivation rec {
@@ -30,14 +30,14 @@
 
           dontWrapQtApps = true;
 
-          nativeBuildInputs = with pkgs; [
-            dpkg
-            autoPatchelfHook
-            makeWrapper
+          nativeBuildInputs = with pkgs; [ 
+            dpkg 
+            autoPatchelfHook 
+            makeWrapper 
           ];
 
           buildInputs = with pkgs; [
-            # Системные библиотеки
+            # Базовый набор
             alsa-lib
             at-spi2-atk
             at-spi2-core
@@ -60,10 +60,8 @@
             nss
             pango
             wayland
-            openssl
-            pipewire # Исправляет "Couldn't load pipewire-0.3 library"
-            
-            # X11 библиотеки
+
+            # Основные X11 библиотеки
             libx11
             libxcomposite
             libxdamage
@@ -73,30 +71,24 @@
             libxrender
             libxscrnsaver
             libxcb
-            libxmu
-            libxpm
-            libxres
-            libxt
-            libxtst
-            libxkbfile
-            libxv
-            libfontenc
-            libxaw
 
-            # === Qt6 модули (полный набор) ===
-            qt6.qtbase
-            qt6.qtdeclarative
-            qt6.qtsvg
-            qt6.qtimageformats
+            # Доп. библиотеки
+            libXmu
+            libXpm
+            libXres
+            libXt
+            libXtst
+            libxcb-wm
+            libxcb-image
+            libxcb-render-util
+            libxcb-util
+
+            # Зависимости из лога
+            libxkbfile
+            libXv
+            libfontenc
+            libXaw
             qt6.qtserialport
-            qt6.qtmultimedia
-            qt6.qtwebchannel
-            qt6.qtwebengine
-            qt6.qtwebview
-            qt6.qtpositioning
-            qt6.qtquick3d
-            qt6.qtwayland
-            qt6.qtlottie
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -106,36 +98,15 @@
 
             mkdir -p $out
 
-            # Переносим файлы
-            if [ -d "usr" ]; then mv usr/* $out/ 2>/dev/null || true; fi
-            if [ -d "opt" ]; then mv opt/* $out/ 2>/dev/null || true; fi
+            # Переносим /usr
+            if [ -d "usr" ]; then
+                mv usr/* $out/ 2>/dev/null || true
+            fi
 
-            # ---------------------------------------------------------
-            # УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК
-            # ---------------------------------------------------------
-            echo "Removing bundled libraries to use Nixpkgs versions..."
-
-            clean_libs() {
-              local LIB_DIR="$1"
-              if [ -d "$LIB_DIR" ]; then
-                echo "Cleaning $LIB_DIR..."
-                # Удаляем основные Qt и системные либы, чтобы использовать Nixpkgs
-                rm -f "$LIB_DIR"/libQt6*.so*
-                rm -f "$LIB_DIR"/libicu*.so*
-                rm -f "$LIB_DIR"/libssl.so*
-                rm -f "$LIB_DIR"/libcrypto.so*
-                rm -f "$LIB_DIR"/libgio-2.0.so*
-                rm -f "$LIB_DIR"/libglib-2.0.so*
-                rm -f "$LIB_DIR"/libgmodule-2.0.so*
-                rm -f "$LIB_DIR"/libgobject-2.0.so*
-                rm -f "$LIB_DIR"/libmount.so*
-                rm -f "$LIB_DIR"/libselinux.so*
-              fi
-            }
-
-            # Чистим основные папки с библиотеками
-            clean_libs "$out/share/max/lib64"
-            clean_libs "$out/share/max/bin/max-service/lib64"
+            # Переносим /opt
+            if [ -d "opt" ]; then
+                mv opt/* $out/ 2>/dev/null || true
+            fi
 
             # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
@@ -145,63 +116,56 @@
 
             if [ -f "$SERVICE_BIN_REAL" ]; then
               echo "Wrapping MAX Service binary..."
+              
               mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
               
+              # Папки для ресурсов сервиса
+              SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
+              SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
+
+              # ИСПРАВЛЕНИЕ КОНФЛИКТА БИБЛИОТЕК
+              rm -f "$SERVICE_LIB_DIR/libmount.so.1"
+              rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
+              echo "Removed conflicting bundled libs (libmount, libselinux)"
+
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
-                --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
+                --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
-                --set QT_PLUGIN_PATH "$SERVICE_DIR/plugins"
+                --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
+            else
+              echo "Warning: MAX Service binary not found!"
             fi
 
             # ---------------------------------------------------------
-            # ОБРАБОТКА ГЛАВНОГО ПРИЛОЖЕНИЯ (max)
+            # ОБРАБОТКА ГЛАВНОГО ПРИЛОЖЕНИЯ
             # ---------------------------------------------------------
             MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
 
             if [ -z "$MAIN_BIN" ]; then
-              echo "ERROR: MAX binary not found!"
+              echo "ERROR: MAX binary not found in $out!"
               exit 1
             fi
 
             echo "Found MAX binary at: $MAIN_BIN"
 
-            QT_PLUGINS_DIR=""
-            if [ -d "$out/share/max/plugins" ]; then
-              QT_PLUGINS_DIR="$out/share/max/plugins"
-            elif [ -d "$out/share/max/lib64/plugins" ]; then
-              QT_PLUGINS_DIR="$out/share/max/lib64/plugins"
-            fi
-
-            # Обертка с поддержкой Wayland
-            if [ -n "$QT_PLUGINS_DIR" ]; then
-              makeWrapper "$MAIN_BIN" "$out/bin/max" \
-                --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
-                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]} \
-                --set QT_PLUGIN_PATH "$QT_PLUGINS_DIR" \
-                --set QT_QPA_PLATFORM "wayland;xcb"
-            else
-              makeWrapper "$MAIN_BIN" "$out/bin/max" \
-                --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
-                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]} \
-                --set QT_QPA_PLATFORM "wayland;xcb"
-            fi
+            makeWrapper "$MAIN_BIN" "$out/bin/max" \
+              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
+              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
 
             # ---------------------------------------------------------
-            # ИСПРАВЛЕНИЕ ЯРЛЫКА
+            # ИСПРАВЛЕНИЕ ЯРЛЫКА (.desktop file)
             # ---------------------------------------------------------
             DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
             if [ -n "$DESKTOP_FILE" ]; then
-                echo "Patching .desktop file: $DESKTOP_FILE"
                 substituteInPlace "$DESKTOP_FILE" \
-                  --replace-warn "/usr/share/max/bin/max" "$out/bin/max" \
-                  --replace-warn "/opt/MAX/bin/max" "$out/bin/max"
-                
-                ICON_PATH=$(find $out/share/pixmaps -name "*.png" 2>/dev/null | head -n 1)
-                if [ -n "$ICON_PATH" ]; then
-                   substituteInPlace "$DESKTOP_FILE" --replace-warn "Icon=max" "Icon=$ICON_PATH"
-                fi
+                  --replace "/usr/share/max/bin/max" "$out/bin/max" \
+                  --replace "Exec=MAX" "Exec=$out/bin/max" \
+                  --replace "/opt/MAX" "$out/opt/MAX" \
+                  --replace "Exec=max" "Exec=$out/bin/max"
+                  
+                # Дополнительно поправим Icon путь, если он абсолютный
+                substituteInPlace "$DESKTOP_FILE" \
+                  --replace "Icon=/usr/share/max" "Icon=max"
             fi
 
             runHook postInstall
