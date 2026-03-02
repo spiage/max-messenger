@@ -61,38 +61,42 @@
             pango
             wayland
             openssl
-            xorg.libX11
-            xorg.libXcomposite
-            xorg.libXdamage
-            xorg.libXext
-            xorg.libXfixes
-            xorg.libXrandr
-            xorg.libXrender
-            xorg.libXscrnsaver
-            xorg.libxcb
-            xorg.libXmu
-            xorg.libXpm
-            xorg.libXres
-            xorg.libXt
-            xorg.libXtst
-            xorg.libxkbfile
-            xorg.libXv
-            xorg.libfontenc
-            xorg.libXaw
+            
+            # === X11 библиотеки (новые имена top-level, без xorg.*) ===
+            libx11
+            libxcomposite
+            libxdamage
+            libxext
+            libxfixes
+            libxrandr
+            libxrender
+            libxscrnsaver    # Исправлено: было xorg.libXscrnsaver
+            libxcb
+            
+            # Доп. библиотеки X11
+            libxmu
+            libxpm
+            libxres
+            libxt
+            libxtst
+            libxkbfile
+            libxv
+            libfontenc
+            libxaw
 
-            # === Полный набор Qt6 модулей для удовлетворения всех зависимостей ===
+            # === Qt6 модули ===
             qt6.qtbase
-            qt6.qtdeclarative      # Qml
+            qt6.qtdeclarative
             qt6.qtsvg
             qt6.qtimageformats
             qt6.qtserialport
-            qt6.qtmultimedia       # Multimedia
-            qt6.qtwebchannel       # WebChannel
-            qt6.qtwebengine        # WebEngine (Core + Quick)
-            qt6.qtwebview          # WebView
-            qt6.qtpositioning      # Positioning
-            qt6.qtquick3d          # Quick3D
-            qt6.qtlottie           # Bodymovin (Lottie)
+            qt6.qtmultimedia
+            qt6.qtwebchannel
+            qt6.qtwebengine
+            qt6.qtwebview
+            qt6.qtpositioning
+            qt6.qtquick3d
+            qt6.qtlottie
             qt6.qtwayland
           ];
 
@@ -174,8 +178,7 @@
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
                 --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]} \
                 --set QT_PLUGIN_PATH "$QT_PLUGINS_DIR" \
-                --set QT_QPA_PLATFORM "wayland;xcb" \
-                --set NIX_DEBUG_INFO 1
+                --set QT_QPA_PLATFORM "wayland;xcb"
             else
               makeWrapper "$MAIN_BIN" "$out/bin/max" \
                 --prefix LD_LIBRARY_PATH : "$out/share/max/lib64" \
