@@ -61,6 +61,7 @@
             pango
             wayland
             openssl
+            pipewire # Исправляет "Couldn't load pipewire-0.3 library"
             
             # X11 библиотеки
             libx11
@@ -82,7 +83,7 @@
             libfontenc
             libxaw
 
-            # Qt6 модули
+            # === Qt6 модули (полный набор) ===
             qt6.qtbase
             qt6.qtdeclarative
             qt6.qtsvg
@@ -95,9 +96,7 @@
             qt6.qtpositioning
             qt6.qtquick3d
             qt6.qtwayland
-            
-            # Примечание: qt6.qtlottie отсутствует или сломан в текущем nixpkgs,
-            # поэтому проблемный плагин будет удален в installPhase.
+            qt6.qtlottie
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -112,15 +111,15 @@
             if [ -d "opt" ]; then mv opt/* $out/ 2>/dev/null || true; fi
 
             # ---------------------------------------------------------
-            # УДАЛЕНИЕ КОНФЛИКТУЮЩИХ И ПРОБЛЕМНЫХ БИБЛИОТЕК
+            # УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК
             # ---------------------------------------------------------
-            echo "Removing bundled and problematic libraries..."
+            echo "Removing bundled libraries to use Nixpkgs versions..."
 
             clean_libs() {
               local LIB_DIR="$1"
               if [ -d "$LIB_DIR" ]; then
                 echo "Cleaning $LIB_DIR..."
-                # Bundled Qt, ICU, SSL, GLib
+                # Удаляем основные Qt и системные либы, чтобы использовать Nixpkgs
                 rm -f "$LIB_DIR"/libQt6*.so*
                 rm -f "$LIB_DIR"/libicu*.so*
                 rm -f "$LIB_DIR"/libssl.so*
@@ -134,16 +133,9 @@
               fi
             }
 
+            # Чистим основные папки с библиотеками
             clean_libs "$out/share/max/lib64"
             clean_libs "$out/share/max/bin/max-service/lib64"
-
-            # === WORKAROUND: Удаляем плагин Lottie ===
-            # Требует libQt6Bodymovin.so.6, которой нет в nixpkgs.
-            # Это отключит анимации Lottie, но позволит пакету собраться.
-            echo "Removing Lottie plugins to fix dependency error..."
-            rm -rf $out/share/max/qml/Qt/labs/lottieqt
-            rm -rf $out/share/max/bin/max-service/qml/Qt/labs/lottieqt
-            # =========================================
 
             # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
