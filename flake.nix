@@ -92,6 +92,10 @@
             libfontenc
             libXaw
             qt6.qtserialport
+            qt6.qtdeclarative # <-- Решает ошибку с libQt6Qml
+            qt6.qtwayland     # <-- Для работы на Wayland
+            qt6.qtsvg         # <-- Часто нужен для иконок/графики
+            qt6.qtimageformats
             qt6.qtbase
             openssl
           ];
@@ -138,6 +142,13 @@
             rm -f $out/share/max/lib64/libssl.so*
             rm -f $out/share/max/lib64/libcrypto.so*
 
+            # === ДОБАВИТЬ УДАЛЕНИЕ QT И ICU ===
+            # Удаляем Qt библиотеки, чтобы использовать модули из buildInputs (решает ошибку Qt_6_PRIVATE_API)
+            rm -f $out/share/max/lib64/libQt6*.so*
+            
+            # Удаляем ICU (библиотеки юникода), т.к. они жестко привязаны к версии Qt
+            rm -f $out/share/max/lib64/libicu*.so*
+
             # То же самое для сервиса
             rm -f $out/share/max/bin/max-service/lib64/libgio-2.0.so.0
             rm -f $out/share/max/bin/max-service/lib64/libglib-2.0.so.0
@@ -146,7 +157,9 @@
             rm -f "$out/share/max/bin/max-service/lib64/libmount.so.1"
             rm -f "$out/share/max/bin/max-service/lib64/libselinux.so.1"
             rm -f $out/share/max/bin/max-service/lib64/libssl.so*
-            rm -f $out/share/max/bin/max-service/lib64/libcrypto.so*            
+            rm -f $out/share/max/bin/max-service/lib64/libcrypto.so*     
+            rm -f $out/share/max/bin/max-service/lib64/libQt6*.so*
+            rm -f $out/share/max/bin/max-service/lib64/libicu*.so*
 
             # ---------------------------------------------------------
             # 2. НАСТРОЙКА СЕРВИСА (max-service)
