@@ -61,6 +61,7 @@
             nss
             pango
             wayland
+            openssl # Добавлено для WebEngine
             pipewire 
 
             # X11 библиотеки
@@ -73,19 +74,15 @@
             libxrender
             libxscrnsaver
             libxcb
-
-            # Доп. библиотеки X11
-            libXmu
-            libXpm
-            libXres
-            libXt
-            libXtst
+            libxmu
+            libxpm
+            libxres
+            libxt
+            libxtst
             libxcb-wm
             libxcb-image
             libxcb-render-util
             libxcb-util
-
-            # Зависимости
             libxkbfile
             libXv
             libfontenc
@@ -104,6 +101,40 @@
             if [ -d "usr" ]; then mv usr/* $out/ 2>/dev/null || true; fi
             if [ -d "opt" ]; then mv opt/* $out/ 2>/dev/null || true; fi
 
+            
+            # ---------------------------------------------------------
+            # УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК (ДО авто-патчинга)
+            # ---------------------------------------------------------
+            # Удаляем bundled libstdc++, libgcc_s, libssl, libcrypto, libmount, libselinux
+            # Это заставит autoPatchelfHook использовать системные версии
+            
+            MAIN_LIB_DIR="$out/share/max/lib64"
+            SERVICE_LIB_DIR="$out/share/max/bin/max-service/lib64"
+            
+            echo "Removing conflicting bundled libraries..."
+            
+            # Удаляем из основной директории lib64
+            if [ -d "$MAIN_LIB_DIR" ]; then
+              rm -f "$MAIN_LIB_DIR/libstdc++.so.6"
+              rm -f "$MAIN_LIB_DIR/libgcc_s.so.1"
+              # WebEngine Qt6 часто тащит свои версии SSL,              
+              rm -f "$MAIN_LIB_DIR/libssl.so*"
+              rm -f "$MAIN_LIB_DIR/libcrypto.so*"
+              # Конфликтующие системные библиотеки
+              rm -f "$MAIN_LIB_DIR/libmount.so.1"
+              rm -f "$MAIN_LIB_DIR/libselinux.so.1"
+            fi
+
+            # Удаляем из директории сервиса
+            if [ -d "$SERVICE_LIB_DIR" ]; then
+              rm -f "$SERVICE_LIB_DIR/libstdc++.so.6"
+              rm -f "$SERVICE_LIB_DIR/libgcc_s.so.1"
+              rm -f "$SERVICE_LIB_DIR/libssl.so*"
+              rm -f "$SERVICE_LIB_DIR/libcrypto.so*"
+              rm -f "$SERVICE_LIB_DIR/libmount.so.1"
+              rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
+            fi
+
             # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
             # ---------------------------------------------------------
@@ -114,12 +145,7 @@
               echo "Wrapping MAX Service binary..."
               mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
               
-              SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
-
-              # Удаляем конфликтующие системные библиотеки (кроме libstdc++, libgcc_s)
-              rm -f "$SERVICE_LIB_DIR/libmount.so.1"
-              rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
 
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
@@ -138,11 +164,6 @@
             fi
 
             echo "Found MAX binary at: $MAIN_BIN"
-
-            # Удаляем конфликтующие системные библиотеки из основного бандла
-            MAIN_LIB_DIR="$out/share/max/lib64"
-            rm -f "$MAIN_LIB_DIR/libmount.so.1"
-            rm -f "$MAIN_LIB_DIR/libselinux.so.1"
 
             # Определяем путь к плагинам Qt
             QT_PLUGINS_DIR=""
@@ -183,26 +204,35 @@
             runHook postInstall
           '';
 
-          # Выполняется ПОСЛЕ autoPatchelfHook
+          # ---------------------------------------------------------
+          # ПОСТ-ОБРАБОТКА (УДАЛЕНИЕ ТЕЛЕМЕТРИИ)
+          # Выполняется ПОСЛЕ autoPatchelfHook.
+          # Мы удаляем зависимость от проблемных библиотек у бинарника и libcore.so,
+          # а затем удаляем сами файлы библиотек.
+          # Это предотвращает краш при выходе ("Failed to set TLS value").
+          # ---------------------------------------------------------
           postFixup = ''
             echo "Removing telemetry libraries to fix exit crash..."
             
             # 1. Убираем зависимость от телеметрии у основного бинарника
             if [ -f "$out/share/max/bin/max" ]; then
+                echo "Patching main binary to remove tracer dependency..."
                 patchelf --remove-needed libtracernative.so "$out/share/max/bin/max" || true
                 patchelf --remove-needed libtracer_crash_reporter.so "$out/share/max/bin/max" || true
             fi
 
             # 2. Убираем зависимость у libcore.so (она ссылается на reporter)
             if [ -f "$out/share/max/lib64/libcore.so" ]; then
+                echo "Patching libcore.so to remove reporter dependency..."
                 patchelf --remove-needed libtracer_crash_reporter.so "$out/share/max/lib64/libcore.so" || true
             fi
             
-            # 3. Удаляем сами файлы библиотек, чтобы они не грузились
+            # 3. Удаляем сами файлы библиотек телеметрии
+            echo "Deleting telemetry shared objects..."
             rm -f "$out/share/max/lib64/libtracernative.so"
             rm -f "$out/share/max/lib64/libtracer_crash_reporter.so"
             
-            echo "Telemetry removed."
+            echo "Telemetry removed successfully."
           '';
 
           meta = {
