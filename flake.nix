@@ -93,6 +93,7 @@
             libXaw
             qt6.qtserialport
             qt6.qtbase
+            openssl
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -133,6 +134,10 @@
             rm -f "$out/share/max/lib64/libmount.so.1"
             rm -f "$out/share/max/lib64/libselinux.so.1"
 
+            # Удаляем OpenSSL, т.к. встроенный конфликтует с libngtcp2 из nixpkgs
+            rm -f $out/share/max/lib64/libssl.so*
+            rm -f $out/share/max/lib64/libcrypto.so*
+
             # То же самое для сервиса
             rm -f $out/share/max/bin/max-service/lib64/libgio-2.0.so.0
             rm -f $out/share/max/bin/max-service/lib64/libglib-2.0.so.0
@@ -140,6 +145,8 @@
             rm -f $out/share/max/bin/max-service/lib64/libgobject-2.0.so.0
             rm -f "$out/share/max/bin/max-service/lib64/libmount.so.1"
             rm -f "$out/share/max/bin/max-service/lib64/libselinux.so.1"
+            rm -f $out/share/max/bin/max-service/lib64/libssl.so*
+            rm -f $out/share/max/bin/max-service/lib64/libcrypto.so*            
 
             # ---------------------------------------------------------
             # 2. НАСТРОЙКА СЕРВИСА (max-service)
