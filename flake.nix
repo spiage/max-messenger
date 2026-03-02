@@ -37,7 +37,7 @@
           ];
 
           buildInputs = with pkgs; [
-            # Базовый набор
+            # Системные библиотеки (используются приложением)
             alsa-lib
             at-spi2-atk
             at-spi2-core
@@ -60,8 +60,9 @@
             nss
             pango
             wayland
+            pipewire # Добавлено для поддержки аудио/видео (устраняет предупреждения)
 
-            # Основные X11 библиотеки
+            # X11 библиотеки
             libx11
             libxcomposite
             libxdamage
@@ -72,7 +73,7 @@
             libxscrnsaver
             libxcb
 
-            # Доп. библиотеки
+            # Доп. библиотеки X11
             libXmu
             libXpm
             libXres
@@ -83,12 +84,12 @@
             libxcb-render-util
             libxcb-util
 
-            # Зависимости из лога
+            # Зависимости
             libxkbfile
             libXv
             libfontenc
             libXaw
-            qt6.qtserialport
+            qt6.qtserialport # Единственный необходимый внешний модуль Qt
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -98,12 +99,10 @@
 
             mkdir -p $out
 
-            # Переносим /usr
+            # Переносим файлы из deb-пакета
             if [ -d "usr" ]; then
                 mv usr/* $out/ 2>/dev/null || true
             fi
-
-            # Переносим /opt
             if [ -d "opt" ]; then
                 mv opt/* $out/ 2>/dev/null || true
             fi
@@ -116,14 +115,12 @@
 
             if [ -f "$SERVICE_BIN_REAL" ]; then
               echo "Wrapping MAX Service binary..."
-              
               mv "$SERVICE_BIN_REAL" "$SERVICE_BIN_REAL.real"
               
-              # Папки для ресурсов сервиса
               SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
-              # ИСПРАВЛЕНИЕ КОНФЛИКТА БИБЛИОТЕК
+              # Исправление конфликта библиотек (только для сервиса)
               rm -f "$SERVICE_LIB_DIR/libmount.so.1"
               rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
               echo "Removed conflicting bundled libs (libmount, libselinux)"
@@ -137,7 +134,7 @@
             fi
 
             # ---------------------------------------------------------
-            # ОБРАБОТКА ГЛАВНОГО ПРИЛОЖЕНИЯ
+            # ОБРАБОТКА ГЛАВНОГО ПРИЛОЖЕНИЯ (max)
             # ---------------------------------------------------------
             MAIN_BIN=$(find $out -type f -executable -iname "MAX" | head -n 1)
 
@@ -148,22 +145,44 @@
 
             echo "Found MAX binary at: $MAIN_BIN"
 
-            makeWrapper "$MAIN_BIN" "$out/bin/max" \
-              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
-              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]}
+            # Определяем путь к плагинам Qt (улучшение из первой версии)
+            QT_PLUGINS_DIR=""
+            if [ -d "$out/share/max/plugins" ]; then
+              QT_PLUGINS_DIR="$out/share/max/plugins"
+            elif [ -d "$out/share/max/lib64/plugins" ]; then
+              QT_PLUGINS_DIR="$out/share/max/lib64/plugins"
+            fi
+
+            # Обертка для запуска
+            # Добавляем LD_LIBRARY_PATH для системных библиотек
+            # Явно задаем QT_PLUGIN_PATH (если найден)
+            # Добавляем QT_QPA_PLATFORM для корректной работы на Wayland/X11
+            if [ -n "$QT_PLUGINS_DIR" ]; then
+              makeWrapper "$MAIN_BIN" "$out/bin/max" \
+                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]} \
+                --set QT_PLUGIN_PATH "$QT_PLUGINS_DIR" \
+                --set QT_QPA_PLATFORM "wayland;xcb"
+            else
+              makeWrapper "$MAIN_BIN" "$out/bin/max" \
+                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]} \
+                --set QT_QPA_PLATFORM "wayland;xcb"
+            fi
 
             # ---------------------------------------------------------
             # ИСПРАВЛЕНИЕ ЯРЛЫКА (.desktop file)
             # ---------------------------------------------------------
             DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
             if [ -n "$DESKTOP_FILE" ]; then
+                echo "Patching .desktop file..."
                 substituteInPlace "$DESKTOP_FILE" \
                   --replace "/usr/share/max/bin/max" "$out/bin/max" \
                   --replace "Exec=MAX" "Exec=$out/bin/max" \
                   --replace "/opt/MAX" "$out/opt/MAX" \
                   --replace "Exec=max" "Exec=$out/bin/max"
                   
-                # Дополнительно поправим Icon путь, если он абсолютный
+                # Исправление путей к иконкам
                 substituteInPlace "$DESKTOP_FILE" \
                   --replace "Icon=/usr/share/max" "Icon=max"
             fi
