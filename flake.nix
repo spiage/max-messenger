@@ -37,7 +37,7 @@
           ];
 
           buildInputs = with pkgs; [
-            # Системные библиотеки (используются приложением)
+            # Системные библиотеки
             alsa-lib
             at-spi2-atk
             at-spi2-core
@@ -60,7 +60,7 @@
             nss
             pango
             wayland
-            pipewire # Добавлено для поддержки аудио/видео (устраняет предупреждения)
+            pipewire 
 
             # X11 библиотеки
             libx11
@@ -89,7 +89,7 @@
             libXv
             libfontenc
             libXaw
-            qt6.qtserialport # Единственный необходимый внешний модуль Qt
+            qt6.qtserialport
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -100,12 +100,8 @@
             mkdir -p $out
 
             # Переносим файлы из deb-пакета
-            if [ -d "usr" ]; then
-                mv usr/* $out/ 2>/dev/null || true
-            fi
-            if [ -d "opt" ]; then
-                mv opt/* $out/ 2>/dev/null || true
-            fi
+            if [ -d "usr" ]; then mv usr/* $out/ 2>/dev/null || true; fi
+            if [ -d "opt" ]; then mv opt/* $out/ 2>/dev/null || true; fi
 
             # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
@@ -120,17 +116,17 @@
               SERVICE_LIB_DIR="$SERVICE_DIR/lib64"
               SERVICE_PLUGINS_DIR="$SERVICE_DIR/plugins"
 
-              # Исправление конфликта библиотек (только для сервиса)
+              # Удаляем библиотеки, вызывающие конфликт версий C++ runtime
+              # Это заставит использовать системную libstdc++ и libgcc_s
+              rm -f "$SERVICE_LIB_DIR/libstdc++.so.6"
+              rm -f "$SERVICE_LIB_DIR/libgcc_s.so.1"
               rm -f "$SERVICE_LIB_DIR/libmount.so.1"
               rm -f "$SERVICE_LIB_DIR/libselinux.so.1"
-              echo "Removed conflicting bundled libs (libmount, libselinux)"
 
               makeWrapper "$SERVICE_BIN_REAL.real" "$SERVICE_BIN_REAL" \
                 --prefix LD_LIBRARY_PATH : "$SERVICE_LIB_DIR" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
                 --set QT_PLUGIN_PATH "$SERVICE_PLUGINS_DIR"
-            else
-              echo "Warning: MAX Service binary not found!"
             fi
 
             # ---------------------------------------------------------
@@ -145,7 +141,16 @@
 
             echo "Found MAX binary at: $MAIN_BIN"
 
-            # Определяем путь к плагинам Qt (улучшение из первой версии)
+            # Удаляем конфликтующие библиотеки из основного бандла
+            MAIN_LIB_DIR="$out/share/max/lib64"
+            if [ -d "$MAIN_LIB_DIR" ]; then
+              echo "Removing conflicting bundled libs from main app..."
+              rm -f "$MAIN_LIB_DIR/libstdc++.so.6"
+              rm -f "$MAIN_LIB_DIR/libgcc_s.so.1"
+              # Qt и ICU не трогаем, чтобы не сломать совместимость плагинов
+            fi
+
+            # Определяем путь к плагинам Qt
             QT_PLUGINS_DIR=""
             if [ -d "$out/share/max/plugins" ]; then
               QT_PLUGINS_DIR="$out/share/max/plugins"
@@ -154,9 +159,6 @@
             fi
 
             # Обертка для запуска
-            # Добавляем LD_LIBRARY_PATH для системных библиотек
-            # Явно задаем QT_PLUGIN_PATH (если найден)
-            # Добавляем QT_QPA_PLATFORM для корректной работы на Wayland/X11
             if [ -n "$QT_PLUGINS_DIR" ]; then
               makeWrapper "$MAIN_BIN" "$out/bin/max" \
                 --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath buildInputs} \
@@ -171,18 +173,15 @@
             fi
 
             # ---------------------------------------------------------
-            # ИСПРАВЛЕНИЕ ЯРЛЫКА (.desktop file)
+            # ИСПРАВЛЕНИЕ ЯРЛЫКА
             # ---------------------------------------------------------
             DESKTOP_FILE=$(find $out/share/applications -name "*.desktop" 2>/dev/null | head -n 1)
             if [ -n "$DESKTOP_FILE" ]; then
-                echo "Patching .desktop file..."
                 substituteInPlace "$DESKTOP_FILE" \
                   --replace "/usr/share/max/bin/max" "$out/bin/max" \
                   --replace "Exec=MAX" "Exec=$out/bin/max" \
                   --replace "/opt/MAX" "$out/opt/MAX" \
                   --replace "Exec=max" "Exec=$out/bin/max"
-                  
-                # Исправление путей к иконкам
                 substituteInPlace "$DESKTOP_FILE" \
                   --replace "Icon=/usr/share/max" "Icon=max"
             fi
