@@ -62,7 +62,7 @@
             wayland
             openssl
             
-            # === X11 библиотеки (новые имена top-level, без xorg.*) ===
+            # X11 библиотеки
             libx11
             libxcomposite
             libxdamage
@@ -70,10 +70,8 @@
             libxfixes
             libxrandr
             libxrender
-            libxscrnsaver    # Исправлено: было xorg.libXscrnsaver
+            libxscrnsaver
             libxcb
-            
-            # Доп. библиотеки X11
             libxmu
             libxpm
             libxres
@@ -84,7 +82,7 @@
             libfontenc
             libxaw
 
-            # === Qt6 модули ===
+            # Qt6 модули
             qt6.qtbase
             qt6.qtdeclarative
             qt6.qtsvg
@@ -96,8 +94,10 @@
             qt6.qtwebview
             qt6.qtpositioning
             qt6.qtquick3d
-            qt6.qtlottie
             qt6.qtwayland
+            
+            # Примечание: qt6.qtlottie отсутствует или сломан в текущем nixpkgs,
+            # поэтому проблемный плагин будет удален в installPhase.
           ];
 
           unpackPhase = "dpkg -x $src .";
@@ -112,14 +112,15 @@
             if [ -d "opt" ]; then mv opt/* $out/ 2>/dev/null || true; fi
 
             # ---------------------------------------------------------
-            # УДАЛЕНИЕ КОНФЛИКТУЮЩИХ БИБЛИОТЕК
+            # УДАЛЕНИЕ КОНФЛИКТУЮЩИХ И ПРОБЛЕМНЫХ БИБЛИОТЕК
             # ---------------------------------------------------------
-            echo "Removing bundled libraries to use Nixpkgs versions..."
+            echo "Removing bundled and problematic libraries..."
 
             clean_libs() {
               local LIB_DIR="$1"
               if [ -d "$LIB_DIR" ]; then
                 echo "Cleaning $LIB_DIR..."
+                # Bundled Qt, ICU, SSL, GLib
                 rm -f "$LIB_DIR"/libQt6*.so*
                 rm -f "$LIB_DIR"/libicu*.so*
                 rm -f "$LIB_DIR"/libssl.so*
@@ -135,6 +136,14 @@
 
             clean_libs "$out/share/max/lib64"
             clean_libs "$out/share/max/bin/max-service/lib64"
+
+            # === WORKAROUND: Удаляем плагин Lottie ===
+            # Требует libQt6Bodymovin.so.6, которой нет в nixpkgs.
+            # Это отключит анимации Lottie, но позволит пакету собраться.
+            echo "Removing Lottie plugins to fix dependency error..."
+            rm -rf $out/share/max/qml/Qt/labs/lottieqt
+            rm -rf $out/share/max/bin/max-service/qml/Qt/labs/lottieqt
+            # =========================================
 
             # ---------------------------------------------------------
             # НАСТРОЙКА СЕРВИСА (max-service)
