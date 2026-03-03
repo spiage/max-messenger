@@ -122,13 +122,13 @@
             echo "Cleaning up broken symlinks caused by max-service removal..."
             find $out/share/max/lib64 -xtype l -delete
 
-            # --- 2. УДАЛЕНИЕ СТАРОЙ GLIB ---
-            echo "Removing bundled GLib libraries to use system GLib..."
-            rm -f $out/share/max/lib64/libglib-2.0.so*
-            rm -f $out/share/max/lib64/libgobject-2.0.so*
-            rm -f $out/share/max/lib64/libgio-2.0.so*
-            rm -f $out/share/max/lib64/libgmodule-2.0.so*
-            rm -f $out/share/max/lib64/libgthread-2.0.so*
+            # # --- 2. УДАЛЕНИЕ СТАРОЙ GLIB ---
+            # echo "Removing bundled GLib libraries to use system GLib..."
+            # rm -f $out/share/max/lib64/libglib-2.0.so*
+            # rm -f $out/share/max/lib64/libgobject-2.0.so*
+            # rm -f $out/share/max/lib64/libgio-2.0.so*
+            # rm -f $out/share/max/lib64/libgmodule-2.0.so*
+            # rm -f $out/share/max/lib64/libgthread-2.0.so*
 
             # --- 3. QT.CONF ---
             mkdir -p $out/share/max/bin
