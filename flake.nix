@@ -14,8 +14,8 @@
           config.allowUnfree = true; 
         };
 
-        version = "26.5.1";
-        debFile = "MAX-${version}.48203.deb";
+        version = "26.6.0";
+        debFile = "MAX-26.6.0.49380.deb";
         srcUrl = "https://download.max.ru/linux/deb/pool/main/m/max/${debFile}";
         srcHash = "sha256-Wralrk1JzfL96jfGQvdgqHeIv46xSDlL/rT4E8v0Sb0=";
 
