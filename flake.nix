@@ -68,9 +68,11 @@
           exec = "max %U";
           icon = "max";
           desktopName = "MAX";
+          comment = "MAX Messenger";
           categories = [ "Network" "InstantMessaging" ];
-          mimeTypes = [ "x-scheme-handler/max" ];
+          startupNotify = true;
           terminal = false;
+          mimeTypes = [ "x-scheme-handler/max" ];
         };
 
       in
@@ -103,43 +105,38 @@
           installPhase = ''
             runHook preInstall
 
+            # 1. Копируем саму программу
             mkdir -p $out/share/max
-            if [ -d "usr/share/max" ]; then
-              cp -r usr/share/max/* $out/share/max/
+            cp -r usr/share/max/* $out/share/max/
+
+            # 2. Копируем иконки (НАЙДЕНО КОМАНДОЙ FIND)
+            # Прошлый код не копировал эти папки, поэтому иконки пропадали.
+            
+            # Копируем папку с иконками темы (hicolor)
+            if [ -d "usr/share/icons" ]; then
+              cp -r usr/share/icons $out/share/
             fi
 
-            # --- 1. ПОЛНАЯ ОЧИСТКА ОТ КОНФЛИКТУЮЩИХ СИСТЕМНЫХ БИБЛИОТЕК ---
-            # Удаляем bundled версии, чтобы autoPatchelfHook подцепил системные пакеты
-            echo "Removing conflicting system libraries (glib, mount, selinux, etc.)..."
-            
-            # Очистка от старой glib (Клиент и Сервис)
+            # Копируем папку pixmaps (где лежит max.png напрямую)
+            if [ -d "usr/share/pixmaps" ]; then
+              cp -r usr/share/pixmaps $out/share/
+            fi
+
+            # --- 1. УДАЛЕНИЕ max-service ---
+            echo "Removing max-service directory..."
+            rm -rf $out/share/max/bin/max-service
+
+            # --- 1.5 ОЧИСТКА БИТЫХ СИМЛИНКОВ ---
+            echo "Cleaning up broken symlinks caused by max-service removal..."
+            find $out/share/max/lib64 -xtype l -delete
+
+            # --- 2. УДАЛЕНИЕ СТАРОЙ GLIB ---
+            echo "Removing bundled GLib libraries to use system GLib..."
             rm -f $out/share/max/lib64/libglib-2.0.so*
             rm -f $out/share/max/lib64/libgobject-2.0.so*
             rm -f $out/share/max/lib64/libgio-2.0.so*
             rm -f $out/share/max/lib64/libgmodule-2.0.so*
             rm -f $out/share/max/lib64/libgthread-2.0.so*
-
-            rm -f $out/share/max/bin/max-service/lib64/libglib-2.0.so*
-            rm -f $out/share/max/bin/max-service/lib64/libgobject-2.0.so*
-            rm -f $out/share/max/bin/max-service/lib64/libgio-2.0.so*
-            rm -f $out/share/max/bin/max-service/lib64/libgmodule-2.0.so*
-            rm -f $out/share/max/bin/max-service/lib64/libgthread-2.0.so*
-
-            # Очистка от старых утилит (вызывали ошибку MOUNT_2_40)
-            rm -f $out/share/max/bin/max-service/lib64/libmount.so.1*
-            rm -f $out/share/max/bin/max-service/lib64/libblkid.so.1*
-            rm -f $out/share/max/bin/max-service/lib64/libselinux.so.1*
-            rm -f $out/share/max/bin/max-service/lib64/libuuid.so.1*
-            rm -f $out/share/max/bin/max-service/lib64/libpcre2-8.so.0*
-            rm -f $out/share/max/bin/max-service/lib64/libcap.so.2*
-
-            # --- 2. ИСПРАВЛЕНИЕ СИМЛИНКА ---
-            SERVICE_LIB_DIR="$out/share/max/bin/max-service/lib64"
-            if [ -L "$SERVICE_LIB_DIR/libtracernative.so" ]; then
-              echo "Fixing broken symlink in max-service..."
-              rm "$SERVICE_LIB_DIR/libtracernative.so"
-              ln -s ../../../lib64/libtracernative.so "$SERVICE_LIB_DIR/libtracernative.so"
-            fi
 
             # --- 3. QT.CONF ---
             mkdir -p $out/share/max/bin
@@ -147,21 +144,6 @@
             echo "Prefix = .." >> $out/share/max/bin/qt.conf
             echo "Libraries = lib64" >> $out/share/max/bin/qt.conf
             echo "Plugins = plugins" >> $out/share/max/bin/qt.conf
-
-            mkdir -p $out/share/max/bin/max-service/bin
-            echo "[Paths]" > $out/share/max/bin/max-service/bin/qt.conf
-            echo "Prefix = ../../.." >> $out/share/max/bin/max-service/bin/qt.conf
-            echo "Libraries = lib64" >> $out/share/max/bin/max-service/bin/qt.conf
-            echo "Plugins = plugins" >> $out/share/max/bin/max-service/bin/qt.conf
-
-            # --- 4. ПОИСК ИКОНКИ ---
-            mkdir -p $out/share/pixmaps
-            find $out/share/max -iname "max.png" | head -1 | while read icon; do
-              cp "$icon" $out/share/pixmaps/max.png
-            done
-            if [ ! -f "$out/share/pixmaps/max.png" ]; then
-              find . -path "*/pixmaps/max.png" -o -path "*/icons/hicolor/*/apps/max.png" | head -1 | xargs -r cp -t $out/share/pixmaps/max.png || true
-            fi
 
             runHook postInstall
           '';
