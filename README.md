@@ -72,7 +72,7 @@ max-messenger/
 
 ## Особенности сборки
 
-- **Версия:** 26.5.1 (сборка 48203)
+- **Версия:** 26.6.0 (сборка 49380)
 - **Источник:** официальный DEB-пакет с `download.max.ru`
 - **Qt 6** с полной поддержкой плагинов
 - **Системные библиотеки:** GLib, GTK3, X11, Wayland используются из Nixpkgs
@@ -102,10 +102,10 @@ git commit -am "Update MAX to <версия>"
 2. Получите хеш:
 
    ```bash
-   nix-prefetch-url https://download.max.ru/linux/deb/pool/main/m/max/MAX-<версия>.deb --print-path2
+   nix hash file --sri /путь/к/MAX-<версия>.deb
    ```
 
-3. Обновите `version`, `debFile` и `hash` в `flake.nix`
+3. Обновите `version`, `debFile` и `srcHash` в `flake.nix`
 
 ## Решение проблем
 
