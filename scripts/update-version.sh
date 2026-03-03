@@ -17,18 +17,19 @@ update_flake() {
     echo "✅ Целевая версия: $VERSION"
     echo "   Файл: $DEB_FILE"
 
-    # Проверяем текущую версию во flake.nix
+    # Проверяем текущую версию и файл во flake.nix
     CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' "$FLAKE_FILE" | head -n 1)
     CURRENT_DEB=$(grep -oP 'debFile = "\K[^"]+' "$FLAKE_FILE" | head -n 1)
 
     if [[ "$DEB_FILE" == "$CURRENT_DEB" ]]; then
         echo "✓ Версия актуальна: $CURRENT_VERSION"
-        exit 0
+        echo "   Но хеш может быть устаревшим, поэтому продолжим..."
+        echo ""
+    else
+        echo "📥 Текущая версия: $CURRENT_VERSION ($CURRENT_DEB)"
+        echo "📥 Новая версия: $VERSION ($DEB_FILE)"
+        echo ""
     fi
-
-    echo "📥 Текущая версия: $CURRENT_VERSION ($CURRENT_DEB)"
-    echo "📥 Новая версия: $VERSION ($DEB_FILE)"
-    echo ""
 
     # Проверяем доступность файла
     echo "🔍 Проверка доступности файла..."
@@ -56,13 +57,18 @@ update_flake() {
     curl -L -s -o "$TEMP_FILE" "$DEB_URL"
 
     echo "🔐 Вычисление SHA256 хеша..."
-    # Приоритет nix-prefetch-url, иначе sha256sum (с конвертацией в SRI для Nix, если нужно)
-    if command -v nix-prefetch-url &> /dev/null; then
-        HASH=$(nix-prefetch-url --type sha256 "file://$TEMP_FILE" 2>/dev/null | tail -n 1)
+    # Используем nix hash file --sri для получения хеша в формате SRI (base64)
+    if command -v nix &> /dev/null; then
+        HASH=$(nix hash file --sri "$TEMP_FILE" 2>/dev/null)
+    elif command -v nix-prefetch-url &> /dev/null; then
+        # Fallback: nix-prefetch-url возвращает base16, нужно конвертировать
+        HASH=$(nix-prefetch-url "file://$TEMP_FILE" 2>/dev/null | tail -n 1)
+        HASH="sha256-$HASH"
+        echo "⚠️  Используем base16 хеш (возможна проблема с форматом)"
     else
-        # Если nix нет, просто считаем хеш (потребуется ручная правка формата в flake.nix, если он ждет SRI)
+        # Если nix нет, просто считаем хеш
         HASH=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
-        echo "⚠️  nix-prefetch-url не найден, хеш в base16: $HASH"
+        echo "⚠️  nix не найден, хеш в base16: $HASH"
     fi
 
     if [[ -z "$HASH" ]]; then
@@ -78,15 +84,20 @@ update_flake() {
 
     sed -i "s/version = \"[^\"]*\";/version = \"$VERSION\";/" "$FLAKE_FILE"
     sed -i "s/debFile = \"[^\"]*\";/debFile = \"$DEB_FILE\";/" "$FLAKE_FILE"
-    sed -i "s/hash = \"[^\"]*\";/hash = \"$HASH\";/" "$FLAKE_FILE"
+    sed -i "s/srcHash = \"[^\"]*\";/srcHash = \"$HASH\";/" "$FLAKE_FILE"
 
     echo ""
     echo "✅ Готово!"
     echo ""
-    echo "Изменения:"
-    echo "  version:  $CURRENT_VERSION → $VERSION"
-    echo "  debFile:  $CURRENT_DEB → $DEB_FILE"
-    echo "  hash:     обновлён"
+    if [[ "$DEB_FILE" == "$CURRENT_DEB" ]]; then
+        echo "Изменения:"
+        echo "  hash:     обновлён (версия не изменилась)"
+    else
+        echo "Изменения:"
+        echo "  version:  $CURRENT_VERSION → $VERSION"
+        echo "  debFile:  $CURRENT_DEB → $DEB_FILE"
+        echo "  hash:     обновлён"
+    fi
 }
 
 # Функция для получения версии из репозитория (без apt)
