@@ -64,7 +64,7 @@
         ];
 
         desktopItem = pkgs.makeDesktopItem {
-          name = "max";
+          name = "MAX"; 
           exec = "max %U";
           icon = "max";
           desktopName = "MAX";
@@ -73,6 +73,7 @@
           startupNotify = true;
           terminal = false;
           mimeTypes = [ "x-scheme-handler/max" ];
+          startupWMClass = "max"; 
         };
 
       in
