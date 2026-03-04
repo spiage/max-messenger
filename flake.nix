@@ -21,46 +21,48 @@
 
         libs = with pkgs; [
           # X11 Core
-          libX11 libXcomposite libXcursor libXdamage libXext
-          libXfixes libXi libXrandr libXrender libXScrnSaver
-          libXtst libice libsm libxshmfence libxkbfile
-          
+          libX11 libXau libXcomposite libXcursor libXdamage libXdmcp
+          libXext libXfixes libXi libXinerama libXrandr libXrender
+          libXScrnSaver libXtst libxshmfence
+
           # X11 Toolkit libs
-          libXt libXmu libXpm libXaw libXres
-          
+          libXt libXmu libXpm libXaw libXres libICE libSM libfontenc
+
           # Доп. X11
-          libXv libfontenc
+          libXv libxkbfile libXxf86vm
 
           # XCB Utils
-          libxcb-util libxcb-cursor libxcb-keysyms libxcb-image libxcb-render-util libxcb-wm
+          libxcb libxcb-cursor libxcb-image libxcb-keysyms libxcb-render-util
+          libxcb-util libxcb-wm
 
-          # XCB Base
-          libxcb
-          
           # Graphics & Video
-          libGL libglvnd mesa libdrm libgbm libva libvdpau
-          
+          libglvnd mesa libdrm libva-minimal libvdpau libvpl
+
           # Wayland & Input
           wayland libxkbcommon
-          
+
           # Audio
-          alsa-lib pipewire
-          libpulseaudio
-          
+          alsa-lib pipewire libpulseaudio libasyncns libogg libsndfile libvorbis
+
           # Basic Stack
-          glib fontconfig freetype dbus openssl nss nspr
-          
-          # System libs (Имена пакетов по твоему поиску)
-          util-linux libselinux pcre2 libcap
-          
+          glib fontconfig freetype dbus nspr nss pango cairo gdk-pixbuf
+
+          # System libs
+          bzip2 expat libcap libconfig libgcrypt libgpg-error libpng libuuid
+          libz lz4 xz zstd systemdLibs at-spi2-core
+
           # QT Modules
           qt6.qtserialport
 
           # System & Auth
-          cups krb5 libnotify
-          
-          # Tray Icon
-          libappindicator-gtk3
+          cups krb5 libnotify libsecret
+
+          # Media
+          ffmpeg icu
+
+          # GTK Stack
+          gtk3
+
         ];
 
         desktopItem = pkgs.makeDesktopItem {
