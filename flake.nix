@@ -36,7 +36,7 @@
           libxcb-util libxcb-wm
 
           # Graphics & Video
-          libGL mesa libdrm libva-minimal libvdpau libvpl
+          libGL mesa vulkan-loader libdrm libva-minimal libvdpau libvpl
 
           # Wayland & Input
           wayland libxkbcommon
@@ -183,20 +183,27 @@
 
           postFixup = ''
             # --- 5. WRAPPERS ---
-            
+
+            # Путь к драйверам Mesa (DRI), иначе MESA-LOADER ищет /usr/lib64/dri,
+            # которого нет на NixOS
+            export LIBGL_DRIVERS_PATH="${pkgs.mesa}/lib/dri"
+
             # Основной клиент
             wrapProgram $out/share/max/bin/max \
               --set QT_QPA_PLATFORM "wayland;xcb" \
+              --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
+              --set QSG_RHI_BACKEND "vulkan" \
               --set QT_PLUGIN_PATH "$out/share/max/plugins" \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath libs}:$out/share/max/lib64:$out/share/max/bin/max-service/lib64" \
-              --prefix XDG_DATA_DIRS : "$out/share"
+              --prefix XDG_DATA_DIRS : "${pkgs.mesa}/share:$out/share"
 
             # Сервис
             wrapProgram $out/share/max/bin/max-service/bin/max-service \
               --set QT_QPA_PLATFORM "wayland;xcb" \
+              --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath libs}:$out/share/max/bin/max-service/lib64:$out/share/max/lib64" \
               --set QT_PLUGIN_PATH "$out/share/max/plugins:$out/share/max/bin/max-service/plugins" \
-              --prefix XDG_DATA_DIRS : "$out/share"
+              --prefix XDG_DATA_DIRS : "${pkgs.mesa}/share:$out/share"
 
             mkdir -p $out/bin
             ln -sf $out/share/max/bin/max $out/bin/max
