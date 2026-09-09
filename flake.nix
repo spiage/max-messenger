@@ -45,10 +45,10 @@
           alsa-lib pipewire libpulseaudio libasyncns libogg libsndfile libvorbis
 
           # Basic Stack
-          glib fontconfig freetype dbus nspr nss pango cairo gdk-pixbuf
+          glib fontconfig freetype dbus nspr nss pango harfbuzz fribidi cairo gdk-pixbuf
 
           # System libs
-          bzip2 expat libcap libgcrypt libgpg-error libpng libuuid
+          bzip2 expat libcap libgcrypt libgpg-error libpng libuuid pixman
           libz lz4 xz zstd systemdLibs at-spi2-core
 
           # QT Modules
@@ -63,6 +63,22 @@
           # GTK Stack
           gtk3
 
+        ];
+
+        # Только графические библиотеки для LD_LIBRARY_PATH основного клиента.
+        # Через них Qt/Chromium находит Vulkan/EGL/GBM на NixOS (без этого клиент
+        # падает с SIGSEGV при QSG_RHI_BACKEND=vulkan), НО в отличие от полного
+        # набора `libs` они не содержат конфликтующих системных библиотек
+        # (pixman/harfbuzz/nss/cairo/pango), которые ломали браузер (firefox)
+        # при открытии ссылок из MAX из-за утечки LD_LIBRARY_PATH в дочерние процессы.
+        glLibs = with pkgs; [
+          vulkan-loader
+          mesa
+          libglvnd
+          libdrm
+          libva-minimal
+          wayland
+          libxkbcommon
         ];
 
         desktopItem = pkgs.makeDesktopItem {
@@ -189,12 +205,16 @@
             export LIBGL_DRIVERS_PATH="${pkgs.mesa}/lib/dri"
 
             # Основной клиент
+            # Полный LD_LIBRARY_PATH (из `libs`) НЕ используется: он бы утёк
+            # в дочерние процессы (xdg-open -> firefox) и сломал браузер из-за
+            # конфликта версий (bundled pixman/harfbuzz/nss). Достаточно только
+            # графических библиотек (glLibs): они нужны Qt/Chromium для Vulkan.
             wrapProgram $out/share/max/bin/max \
               --set QT_QPA_PLATFORM "wayland;xcb" \
               --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
               --set QSG_RHI_BACKEND "vulkan" \
               --set QT_PLUGIN_PATH "$out/share/max/plugins" \
-              --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath libs}:$out/share/max/lib64:$out/share/max/bin/max-service/lib64" \
+              --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath glLibs}" \
               --prefix XDG_DATA_DIRS : "${pkgs.mesa}/share:$out/share"
 
             # Сервис
