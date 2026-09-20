@@ -213,6 +213,7 @@
               --set QT_QPA_PLATFORM "wayland;xcb" \
               --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
               --set QSG_RHI_BACKEND "vulkan" \
+              --set GSETTINGS_SCHEMA_DIR "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}/glib-2.0/schemas" \
               --set QT_PLUGIN_PATH "$out/share/max/plugins" \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath glLibs}" \
               --prefix XDG_DATA_DIRS : "${pkgs.mesa}/share:$out/share"
