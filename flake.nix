@@ -217,6 +217,7 @@
             # ломать firefox при открытии ссылок.
             wrapProgram $out/share/max/bin/max \
               --set QT_QPA_PLATFORM "wayland;xcb" \
+              --set QT_QPA_PLATFORMTHEME "xdgdesktopportal" \
               --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
               --set QSG_RHI_BACKEND "vulkan" \
               --set GSETTINGS_SCHEMA_DIR "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}/glib-2.0/schemas" \
@@ -229,6 +230,7 @@
             # Сервис
             wrapProgram $out/share/max/bin/max-service/bin/max-service \
               --set QT_QPA_PLATFORM "wayland;xcb" \
+              --set QT_QPA_PLATFORMTHEME "xdgdesktopportal" \
               --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
               --unset GDK_PIXBUF_MODULE_FILE \
               --unset GDK_PIXBUF_MODULE_PATH \
