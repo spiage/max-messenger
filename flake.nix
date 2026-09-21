@@ -210,9 +210,12 @@
             # ломал отрисовку диалога сохранения (Qt QPA рендерил его как
             # чёрный/дефолтный), тогда как ванильный клиент сам корректно
             # использует GTK из DEB.
-            # Краш из GNOME dash (librsvg svg-loader + старого bundled pango
+            #
+            # Краш filepicker при запуске Max из окружения GNOME (dash либо
+            # главное меню) (librsvg svg-loader + старого bundled pango
             # 1.42 -> pango_attr_overline_new) снимается unset'ом GDK_PIXBUF_*:
             # без GDK_PIXBUF_MODULE_FILE librsvg вовсе не загружается.
+            #
             # nss/nspr и bundled-каталоги DEB сюда НЕ попадают, чтобы не
             # ломать firefox при открытии ссылок.
             wrapProgram $out/share/max/bin/max \
