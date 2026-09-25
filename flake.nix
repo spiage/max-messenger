@@ -205,23 +205,38 @@
             export LIBGL_DRIVERS_PATH="${pkgs.mesa}/lib/dri"
 
             # Основной клиент
-            # Полный LD_LIBRARY_PATH (из `libs`) НЕ используется: он бы утёк
-            # в дочерние процессы (xdg-open -> firefox) и сломал браузер из-за
-            # конфликта версий (bundled pixman/harfbuzz/nss). Достаточно только
-            # графических библиотек (glLibs): они нужны Qt/Chromium для Vulkan.
+            # LD_LIBRARY_PATH только glLibs (графика/Vulkan).
+            # gtkLibs сюда НЕ добавляем: системный GTK3-стек в пути клиента
+            # ломал отрисовку диалога сохранения (Qt QPA рендерил его как
+            # чёрный/дефолтный), тогда как ванильный клиент сам корректно
+            # использует GTK из DEB.
+            #
+            # Краш filepicker при запуске Max из окружения GNOME (dash либо
+            # главное меню) (librsvg svg-loader + старого bundled pango
+            # 1.42 -> pango_attr_overline_new) снимается unset'ом GDK_PIXBUF_*:
+            # без GDK_PIXBUF_MODULE_FILE librsvg вовсе не загружается.
+            #
+            # nss/nspr и bundled-каталоги DEB сюда НЕ попадают, чтобы не
+            # ломать firefox при открытии ссылок.
             wrapProgram $out/share/max/bin/max \
               --set QT_QPA_PLATFORM "wayland;xcb" \
+              --set QT_QPA_PLATFORMTHEME "xdgdesktopportal" \
               --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
               --set QSG_RHI_BACKEND "vulkan" \
               --set GSETTINGS_SCHEMA_DIR "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}/glib-2.0/schemas" \
               --set QT_PLUGIN_PATH "$out/share/max/plugins" \
+              --unset GDK_PIXBUF_MODULE_FILE \
+              --unset GDK_PIXBUF_MODULE_PATH \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath glLibs}" \
               --prefix XDG_DATA_DIRS : "${pkgs.mesa}/share:$out/share"
 
             # Сервис
             wrapProgram $out/share/max/bin/max-service/bin/max-service \
               --set QT_QPA_PLATFORM "wayland;xcb" \
+              --set QT_QPA_PLATFORMTHEME "xdgdesktopportal" \
               --set LIBGL_DRIVERS_PATH "${pkgs.mesa}/lib/dri" \
+              --unset GDK_PIXBUF_MODULE_FILE \
+              --unset GDK_PIXBUF_MODULE_PATH \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath libs}:$out/share/max/bin/max-service/lib64:$out/share/max/lib64" \
               --set QT_PLUGIN_PATH "$out/share/max/plugins:$out/share/max/bin/max-service/plugins" \
               --prefix XDG_DATA_DIRS : "${pkgs.mesa}/share:$out/share"
