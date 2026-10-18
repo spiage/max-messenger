@@ -17,7 +17,7 @@
         version = "26.35.2";
         debFile = "MAX-26.35.2.80824.deb";
         srcUrl = "https://download.max.ru/linux/deb/pool/main/m/max/${debFile}";
-        srcHash = "f5162d4b172fee0bd71b79313bca91946df1c851776423812c1d3c2a87228d97";
+        srcHash = "sha256-9RYtSxcv7gvXG3kxO8qRlG3xyFF3ZCOBLB08KocijZc=";
 
         libs = with pkgs; [
           # X11 Core

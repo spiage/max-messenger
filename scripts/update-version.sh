@@ -73,23 +73,56 @@ update_flake() {
     echo "⬇️  Скачивание для вычисления хеша..."
     curl -L -s -o "$TEMP_FILE" "$DEB_URL"
 
-    echo "🔐 Вычисление SHA256 хеша..."
-    # Используем nix hash file --sri для получения хеша в формате SRI (base64)
+    echo "🔐 Вычисление SHA256 хеша (SRI)..."
+
+    # base16 (hex) -> SRI без внешних зависимостей (sed/printf/base64 из coreutils)
+    hex_to_sri() {
+        local hex="$1" bytes
+        bytes=$(printf '%s' "$hex" | sed 's/../\\x&/g')
+        printf 'sha256-%s' "$(printf '%b' "$bytes" | base64 | tr -d '\n')"
+    }
+
+    # base16-хеш файла любым доступным инструментом
+    sha256_hex() {
+        if command -v sha256sum &> /dev/null; then
+            sha256sum "$1" | awk '{print $1}'
+        elif command -v shasum &> /dev/null; then
+            shasum -a 256 "$1" | awk '{print $1}'
+        elif command -v openssl &> /dev/null; then
+            openssl dgst -sha256 "$1" | awk '{print $NF}'
+        else
+            echo "❌ Нет ни sha256sum, ни shasum, ни openssl для вычисления хеша" >&2
+            exit 1
+        fi
+    }
+
+    # fetchurl требует SRI (sha256-<base64>), поэтому любой источник приводим к нему.
+    # Скрипт должен работать и без nix — на любом дистрибутиве.
+    HASH=""
+
     if command -v nix &> /dev/null; then
-        HASH=$(nix hash file --sri "$TEMP_FILE" 2>/dev/null)
-    elif command -v nix-prefetch-url &> /dev/null; then
-        # Fallback: nix-prefetch-url возвращает base16, нужно конвертировать
-        HASH=$(nix-prefetch-url "file://$TEMP_FILE" 2>/dev/null | tail -n 1)
-        HASH="sha256-$HASH"
-        echo "⚠️  Используем base16 хеш (возможна проблема с форматом)"
-    else
-        # Если nix нет, просто считаем хеш
-        HASH=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
-        echo "⚠️  nix не найден, хеш в base16: $HASH"
+        # Самый надёжный путь: nix сразу отдаёт SRI
+        HASH=$(nix hash file --sri "$TEMP_FILE" 2>/dev/null || true)
+    fi
+
+    if [[ -z "$HASH" ]] && command -v nix-prefetch-url &> /dev/null; then
+        # nix-prefetch-url отдаёт base32 (nix32), а не base16 — конвертируем в SRI
+        local b32
+        b32=$(nix-prefetch-url "file://$TEMP_FILE" 2>/dev/null | tail -n 1 || true)
+        if [[ -n "$b32" ]]; then
+            HASH=$(nix hash convert --hash-algo sha256 --from nix32 --to sri "$b32" 2>/dev/null || true)
+        fi
     fi
 
     if [[ -z "$HASH" ]]; then
-        echo "❌ Не удалось вычислить хеш"
+        # Работает вообще без nix: sha256sum -> base16 -> SRI
+        HASH=$(hex_to_sri "$(sha256_hex "$TEMP_FILE")")
+        echo "ℹ️  nix недоступен — хеш посчитан через sha256sum и сконвертирован в SRI"
+    fi
+
+    # Защита от записи хеша в неверном формате (base16/base32 без типа)
+    if [[ ! "$HASH" =~ ^sha256-[A-Za-z0-9+/]{43}=$ ]]; then
+        echo "❌ Неожиданный формат хеша: '$HASH'" >&2
         exit 1
     fi
 
